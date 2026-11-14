@@ -15,7 +15,7 @@
     "uri": "media://ephemeral/cap_8Hk2",
     "expires_at": "2026-11-19T18:12:04+02:00"
   },
-  "minimisation": ["exif_stripped", "gps_removed", "downscaled"],
+  "minimisation": ["orientation_applied", "exif_stripped", "gps_removed", "downscaled"],
   "consent_grant_id": "cg_camera_01",
   "captured_at": "2026-11-19T17:52:04+02:00",
   "locale": "fi-FI"

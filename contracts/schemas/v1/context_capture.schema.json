@@ -33,10 +33,10 @@
       "additionalProperties": false
     },
     "minimisation": {
-      "description": "What the phone did before upload. EXIF stripping is mandatory.",
+      "description": "What the phone did before upload. EXIF stripping is mandatory. orientation_applied = the image was rotated upright from its EXIF orientation before EXIF was stripped (DEC-006).",
       "type": "array",
       "uniqueItems": true,
-      "items": { "type": "string", "enum": ["exif_stripped", "gps_removed", "downscaled", "cropped", "faces_blurred"] },
+      "items": { "type": "string", "enum": ["exif_stripped", "gps_removed", "downscaled", "cropped", "faces_blurred", "orientation_applied"] },
       "contains": { "const": "exif_stripped" }
     },
     "consent_grant_id": { "$ref": "common.schema.json#/definitions/Ref" },
