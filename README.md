@@ -1,8 +1,8 @@
-# Risorgenza
+# Spendtacles
 
 **A finance coach in your Ray-Ban Meta glasses.** Look at a price, ask *"Does this fit my week?"* (or *"Mahtuuko tämä viikon budjettiin?"*), and hear an answer built on numbers you can check. Nothing changes without your OK.
 
-Risorgenza is a glasses platform with one stable capability interface. **S-Bank Coach** is the first capability that plugs into it. Built for Junction 2026, challenge *AI Glasses for Everyone, Everyday*.
+Spendtacles is a glasses platform with one stable capability interface. **S-Bank Coach** is the first capability that plugs into it. Built for Junction 2026, challenge *AI Glasses for Everyone, Everyday*.
 
 ## The demo flow
 
