@@ -33,19 +33,29 @@ The dark strip at the top (`glasses: mock · mode: glasses · seq …`) is the d
 - **Consent is fail-closed.** Revoking consent deletes the captures made under it.
 - **Money is never a float.** Amounts are decimal strings end to end.
 
+## No bank connected? Just say a number
+
+With `FINANCE_SOURCE=user_stated` the coach works without any bank data, and without a setup screen. The first time a question needs money figures, it asks one thing out loud and then answers the original question:
+
+> "Does this fit my week?" → "How much do you want to spend until Sunday?" → "About a hundred." → "Got it: 100 euros until Sunday. If the label's right, that leaves about 20. Want me to plan it in?"
+
+- It understands digits and round number words in English and Finnish ("about a hundred", "noin sata"). An unclear answer gets one retry, then the coach drops the question politely. It never guesses.
+- The amount carries over to later weeks. Saying "my budget this week is 60" changes it, and confirmed plans count down from it.
+- Cards label it *"Your weekly amount, as you told me"* and say no bank is connected. These are the user's own figures, so they are not reported as a mock.
+
 ## What's real and what's mocked
 
 | | |
 |---|---|
 | **Real** | Orchestrator, consent, capture pipeline, confirmation signing, number verification, contracts, iOS companion core, the DAT SDK integration (built and driven in CI with Mock Device Kit) |
-| **Mocked** (labelled `mock` in `/health` and on screen) | Finance engine (fixture data: €90.16 safe to spend this week), label reader (always returns the demo €79.90 label), the Coach team's agent (client designed and tested against a fake agent, not yet connected) |
+| **Mocked** (labelled `mock` in `/health` and on screen) | Finance engine in the default `FINANCE_SOURCE=fixture` mode (S-Bank demo numbers: €90.16 safe to spend this week), label reader (always returns the demo €79.90 label), the Coach team's agent (client designed and tested against a fake agent, not yet connected) |
 | **Behind flags** | "Hey Meta" voice launch and glasses-tap confirmation are experimental in DAT 1.0.1, so each has a fallback (DEC-004, DEC-022) |
 
 ## Repository layout
 
 | Path | What it is |
 |---|---|
-| [`backend/`](backend/README.md) | Platform orchestrator + S-Bank Coach adapter. TypeScript, Node 22, Fastify. 39 tests. |
+| [`backend/`](backend/README.md) | Platform orchestrator + S-Bank Coach adapter. TypeScript, Node 22, Fastify. 48 tests. |
 | [`companion-ios/`](companion-ios/README.md) | iOS companion: glasses session, Bluetooth audio, speech, capture, cards. Swift, SwiftUI, Meta Wearables DAT 1.0.1. |
 | [`contracts/`](contracts/README.md) | Versioned JSON Schema contracts, valid/invalid examples as tests, generated TS/Swift/Kotlin/Python types, OpenAPI specs, the adapter interface |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Platform architecture |
@@ -61,6 +71,7 @@ cd contracts && npm install && npm run check
 
 # Backend (fixture data, demo token)
 cd backend && npm install && npm test && npm run dev    # http://localhost:8787
+FINANCE_SOURCE=user_stated npm run dev                  # no-bank-data mode instead of fixture numbers
 curl -H 'authorization: Bearer demo-token' localhost:8787/health
 
 # iOS companion core (macOS or Linux): unit tests, then the end-to-end smoke test against the running backend
