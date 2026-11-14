@@ -23,8 +23,6 @@ These screenshots come from CI, not a mock-up. The UI test runs the real iOS app
   </tr>
 </table>
 
-These screenshots were taken before the app was renamed, so their title still reads "S-Bank Coach". The app now shows "Spendtacles" (DEC-026), and the next CI run will refresh them.
-
 The dark strip under the title (`glasses: mock · mode: glasses · seq …`) is the debug overlay. It is there on purpose: **mocks are never silent** (DEC-005), so the app always shows when simulated glasses or fixture data are in play.
 
 ## Built to be trusted
