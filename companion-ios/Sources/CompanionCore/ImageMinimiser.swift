@@ -35,7 +35,9 @@ public enum ImageMinimiser {
         // Only the compression quality is written: no EXIF, GPS or TIFF dictionaries.
         CGImageDestinationAddImage(dest, image, [kCGImageDestinationLossyCompressionQuality: quality] as CFDictionary)
         guard CGImageDestinationFinalize(dest) else { throw ImageMinimiserError.encodeFailed }
-        return MinimisedImage(data: out as Data, mime: "image/jpeg", steps: ["orientation_applied", "exif_stripped", "gps_removed", "downscaled"])
+        // ImageIO still writes a basic APP1 Exif block; remove all metadata segments.
+        let clean = try JPEGMetadataStripper.strip(out as Data)
+        return MinimisedImage(data: clean, mime: "image/jpeg", steps: ["orientation_applied", "exif_stripped", "gps_removed", "downscaled"])
     }
 }
 #else
@@ -43,8 +45,9 @@ public enum ImageMinimiser {
     /// Without ImageIO (e.g. Linux test runs) nothing can be re-encoded. Only images that are
     /// already clean (like MockGlassesBridge.sampleJPEG) may pass through.
     public static func minimise(_ input: Data, maxPixelSize: Int = 1600, quality: Double = 0.85) throws -> MinimisedImage {
-        guard !containsEXIF(input) else { throw ImageMinimiserError.unsupportedPlatform }
-        return MinimisedImage(data: input, mime: "image/jpeg", steps: ["exif_stripped"])
+        // Can't re-encode here, but metadata can still be removed without touching pixels.
+        guard let clean = try? JPEGMetadataStripper.strip(input) else { throw ImageMinimiserError.unsupportedPlatform }
+        return MinimisedImage(data: clean, mime: "image/jpeg", steps: ["exif_stripped", "gps_removed"])
     }
 }
 #endif

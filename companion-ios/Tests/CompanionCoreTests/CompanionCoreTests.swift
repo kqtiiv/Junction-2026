@@ -164,3 +164,62 @@ final class CaptureTests: XCTestCase {
         XCTAssertEqual(photo, MockGlassesBridge.sampleJPEG())
     }
 }
+
+final class JPEGMetadataStripperTests: XCTestCase {
+    /// Inserts segments after SOI of the sample JPEG.
+    private func jpeg(with segments: [[UInt8]]) -> Data {
+        var b = [UInt8](MockGlassesBridge.sampleJPEG())
+        b.insert(contentsOf: segments.flatMap { $0 }, at: 2)
+        return Data(b)
+    }
+    private func seg(_ marker: UInt8, _ body: [UInt8]) -> [UInt8] {
+        let len = body.count + 2
+        return [0xFF, marker, UInt8(len >> 8), UInt8(len & 0xFF)] + body
+    }
+
+    func testRemovesExifXmpIptcAndComments() throws {
+        let exif = seg(0xE1, Array("Exif\0\0MM\0*GPSDATA".utf8))
+        let xmp = seg(0xE1, Array("http://ns.adobe.com/xap/1.0/\0<x:xmpmeta/>".utf8))
+        let iptc = seg(0xED, Array("Photoshop 3.0\0".utf8))
+        let comment = seg(0xFE, Array("shot at home".utf8))
+        let icc = seg(0xE2, Array("ICC_PROFILE\0".utf8))
+        let dirty = jpeg(with: [exif, xmp, iptc, comment, icc])
+        XCTAssertTrue(containsEXIF(dirty))
+
+        let clean = try JPEGMetadataStripper.strip(dirty)
+        XCTAssertFalse(containsEXIF(clean))
+        XCTAssertNil(clean.range(of: Data("xmpmeta".utf8)))
+        XCTAssertNil(clean.range(of: Data("Photoshop".utf8)))
+        XCTAssertNil(clean.range(of: Data("shot at home".utf8)))
+        XCTAssertNotNil(clean.range(of: Data("ICC_PROFILE".utf8)), "colour profile is kept")
+        XCTAssertEqual(clean, MockGlassesBridge.sampleJPEG().prefix(2) + Data(icc) + MockGlassesBridge.sampleJPEG().dropFirst(2),
+                       "only metadata segments are removed; everything else is byte-identical")
+    }
+
+    func testCleanJPEGIsUnchangedAndScanDataIsCopiedVerbatim() throws {
+        var b = [UInt8](MockGlassesBridge.sampleJPEG())
+        // Replace EOI with a start-of-scan segment followed by entropy data that contains 0xFF 0xE1.
+        b.removeLast(2)
+        b += [0xFF, 0xDA, 0x00, 0x02, 0x12, 0xFF, 0xE1, 0x00, 0x34, 0xFF, 0xD9]
+        let input = Data(b)
+        XCTAssertEqual(try JPEGMetadataStripper.strip(input), input)
+    }
+
+    func testRejectsNonJPEG() {
+        XCTAssertThrowsError(try JPEGMetadataStripper.strip(Data("not a jpeg".utf8)))
+    }
+
+    /// On macOS this runs the real ImageIO re-encode (which adds its own Exif block) + strip:
+    /// exactly the path that failed in the iOS Simulator before the stripper existed.
+    func testMinimiserOutputHasNoEXIF() throws {
+        let photo = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appendingPathComponent("App/Resources/demo_price_label.jpg")
+        var b = [UInt8](try Data(contentsOf: photo))
+        b.insert(contentsOf: seg(0xE1, Array("Exif\0\0MM\0*".utf8)), at: 2)
+        let dirty = Data(b)
+        XCTAssertTrue(containsEXIF(dirty))
+        let out = try ImageMinimiser.minimise(dirty)
+        XCTAssertFalse(containsEXIF(out.data))
+        XCTAssertTrue(out.steps.contains("exif_stripped"))
+    }
+}
