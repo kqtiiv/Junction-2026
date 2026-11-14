@@ -1,0 +1,10 @@
+{
+  "schema": "platform.error/v1",
+  "code": "CONSENT_REQUIRED",
+  "retryable": false,
+  "effect_state": "none",
+  "user_message": { "en": "I need your permission to read receipts first. I've put the request on your phone." },
+  "correlation_id": "corr_8815",
+  "occurred_at": "2026-11-19T17:50:02+02:00",
+  "retry_after_ms": 1000
+}

@@ -226,6 +226,62 @@
       "schema": "voice_intent.schema.json",
       "valid": false,
       "reason": "Spoken turns must carry a transcript"
+    },
+    {
+      "file": "valid/device_session_state.glasses_capture.json",
+      "schema": "device_session_state.schema.json",
+      "valid": true
+    },
+    {
+      "file": "valid/device_session_state.phone_only_hinges_closed.json",
+      "schema": "device_session_state.schema.json",
+      "valid": true
+    },
+    {
+      "file": "invalid/device_session_state.phone_only_without_reason.json",
+      "schema": "device_session_state.schema.json",
+      "valid": false,
+      "reason": "Phone-only mode must state why the glasses are unavailable"
+    },
+    {
+      "file": "invalid/device_session_state.streaming_while_paused.json",
+      "schema": "device_session_state.schema.json",
+      "valid": false,
+      "reason": "A camera stream only exists inside a started device session"
+    },
+    {
+      "file": "invalid/device_session_state.experimental_not_declared.json",
+      "schema": "device_session_state.schema.json",
+      "valid": false,
+      "reason": "Experimental SDK capabilities (voice invocation) must be declared as experimental"
+    },
+    {
+      "file": "invalid/device_session_state.capture_without_stream.json",
+      "schema": "device_session_state.schema.json",
+      "valid": false,
+      "reason": "Publishable photo capture needs an active camera stream"
+    },
+    {
+      "file": "valid/error_envelope.proposal_expired.json",
+      "schema": "error_envelope.schema.json",
+      "valid": true
+    },
+    {
+      "file": "valid/error_envelope.apply_timeout_effect_unknown.json",
+      "schema": "error_envelope.schema.json",
+      "valid": true
+    },
+    {
+      "file": "invalid/error_envelope.effect_unknown_retryable.json",
+      "schema": "error_envelope.schema.json",
+      "valid": false,
+      "reason": "An action that may already have happened must never be retried automatically"
+    },
+    {
+      "file": "invalid/error_envelope.retry_after_on_permanent_error.json",
+      "schema": "error_envelope.schema.json",
+      "valid": false,
+      "reason": "retry_after_ms is only allowed on retryable errors"
     }
   ]
 }

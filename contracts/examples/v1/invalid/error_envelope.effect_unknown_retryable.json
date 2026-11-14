@@ -1,0 +1,9 @@
+{
+  "schema": "platform.error/v1",
+  "code": "CAPABILITY_TIMEOUT",
+  "retryable": true,
+  "effect_state": "unknown",
+  "user_message": { "en": "Something went wrong. Retrying." },
+  "correlation_id": "corr_8814",
+  "occurred_at": "2026-11-19T17:53:44+02:00"
+}

@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://contracts.example/v1/error_envelope.schema.json",
+  "title": "ErrorEnvelope",
+  "description": "Body of every non-2xx HTTP response on the platform's public APIs, and of SSE 'error' events. user_message is safe to show or speak; diagnostics belong in logs keyed by correlation_id, never in this object. Small in-body errors inside ToolResult and DomainResponse keep using common ErrorInfo. See DEC-008.",
+  "type": "object",
+  "required": ["schema", "code", "retryable", "effect_state", "user_message", "correlation_id", "occurred_at"],
+  "properties": {
+    "schema": { "const": "platform.error/v1" },
+    "code": {
+      "description": "UPPER_SNAKE code. Open set: clients must treat unknown codes by their retryable and effect_state flags. Registry: docs/contracts/README.md#error-codes.",
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9_]*$",
+      "maxLength": 64
+    },
+    "retryable": {
+      "description": "true = the same request may be sent again automatically (honour retry_after_ms).",
+      "type": "boolean"
+    },
+    "effect_state": {
+      "description": "Whether the request had a persistent effect. unknown = it may have been applied (e.g. a timeout while applying a confirmed proposal); clients must not replay it and must re-read state first.",
+      "type": "string",
+      "enum": ["none", "applied", "unknown"]
+    },
+    "user_message": {
+      "description": "Short, non-technical, safe to speak aloud: no amounts, no account data, no stack traces.",
+      "$ref": "common.schema.json#/definitions/LText"
+    },
+    "correlation_id": { "$ref": "common.schema.json#/definitions/Ref" },
+    "occurred_at": { "$ref": "common.schema.json#/definitions/Timestamp" },
+    "capability_id": { "$ref": "common.schema.json#/definitions/CapabilityId" },
+    "degraded_to": {
+      "description": "Fallback the platform has already switched to, if any.",
+      "type": "string",
+      "enum": ["phone_only", "fast_path", "cached_cards", "none"]
+    },
+    "retry_after_ms": { "type": "integer", "minimum": 0, "maximum": 600000 }
+  },
+  "allOf": [
+    {
+      "$comment": "An action that may already have happened must never be retried automatically.",
+      "if": { "properties": { "effect_state": { "const": "unknown" } }, "required": ["effect_state"] },
+      "then": { "properties": { "retryable": { "const": false } } }
+    },
+    {
+      "$comment": "A retry hint only makes sense on a retryable error.",
+      "if": { "required": ["retry_after_ms"] },
+      "then": { "properties": { "retryable": { "const": true } } }
+    }
+  ],
+  "patternProperties": { "^x_": {} },
+  "additionalProperties": false
+}

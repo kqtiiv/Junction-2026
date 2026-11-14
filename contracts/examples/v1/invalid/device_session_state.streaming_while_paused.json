@@ -1,0 +1,17 @@
+{
+  "schema": "platform.device_session_state/v1",
+  "session_id": "ses_41",
+  "seq": 18,
+  "observed_at": "2026-11-19T17:52:03+02:00",
+  "mode": "glasses",
+  "glasses_backend": "dat",
+  "registration": "registered",
+  "device_availability": "available",
+  "device_session": "paused",
+  "camera": { "permission": "granted_always", "stream": "streaming" },
+  "audio_route": "glasses_hfp",
+  "interaction": "idle",
+  "device_capabilities": ["photo_capture", "camera_stream"],
+  "experimental_features": [],
+  "degraded_reasons": []
+}

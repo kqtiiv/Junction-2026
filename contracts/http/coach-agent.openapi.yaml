@@ -12,6 +12,9 @@ info:
     - The agent sends `trace.verified: false`; only the platform adapter sets it to true.
     - The agent never applies a change itself. It returns ActionProposals and applies them only
       on POST /v1/confirm with a valid platform signature and matching payload hash.
+    - Every non-2xx response body is a `platform.error/v1` ErrorEnvelope (DEC-008). When applying a
+      confirmation fails in a way that may have left a change behind, return `effect_state: unknown`
+      and `retryable: false`; the platform will re-read state instead of replaying.
 servers:
   - url: https://coach.internal.example
 paths:
@@ -37,6 +40,14 @@ paths:
               schema: { $ref: "../schemas/v1/domain_response.schema.json" }
         "422":
           description: Request failed schema validation
+          content:
+            application/json:
+              schema: { $ref: "../schemas/v1/error_envelope.schema.json" }
+        "503":
+          description: Agent unavailable; the platform switches to its deterministic fast path
+          content:
+            application/json:
+              schema: { $ref: "../schemas/v1/error_envelope.schema.json" }
   /v1/confirm:
     post:
       summary: Apply (or discard) a proposal the user has confirmed or rejected
@@ -52,6 +63,21 @@ paths:
           content:
             application/json:
               schema: { $ref: "../schemas/v1/action_result.schema.json" }
+        "401":
+          description: Signature or payload hash invalid. Nothing was applied.
+          content:
+            application/json:
+              schema: { $ref: "../schemas/v1/error_envelope.schema.json" }
+        "409":
+          description: Proposal unknown, expired, or already decided. Nothing was applied.
+          content:
+            application/json:
+              schema: { $ref: "../schemas/v1/error_envelope.schema.json" }
+        "500":
+          description: Applying failed. `effect_state` says whether anything persisted.
+          content:
+            application/json:
+              schema: { $ref: "../schemas/v1/error_envelope.schema.json" }
   /v1/calculations/{calc_id}:
     get:
       summary: Resolve a calculation id (used by the adapter to verify numbers independently)
@@ -66,6 +92,9 @@ paths:
               schema: { $ref: "../schemas/v1/finance/finance_tool_result.schema.json" }
         "404":
           description: Unknown or not visible to this user
+          content:
+            application/json:
+              schema: { $ref: "../schemas/v1/error_envelope.schema.json" }
   /v1/manifest:
     get:
       summary: Capability manifest

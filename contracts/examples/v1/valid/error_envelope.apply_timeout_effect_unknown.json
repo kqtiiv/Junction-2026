@@ -1,0 +1,14 @@
+{
+  "schema": "platform.error/v1",
+  "code": "CAPABILITY_TIMEOUT",
+  "retryable": false,
+  "effect_state": "unknown",
+  "user_message": {
+    "en": "I couldn't tell whether that was saved. Check your plan on the phone before trying again.",
+    "fi": "En saanut varmistusta tallennuksesta. Tarkista suunnitelma puhelimesta ennen kuin yrität uudelleen."
+  },
+  "correlation_id": "corr_8813",
+  "occurred_at": "2026-11-19T17:53:44+02:00",
+  "capability_id": "sbank.coach",
+  "degraded_to": "phone_only"
+}

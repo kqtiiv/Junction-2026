@@ -1,0 +1,157 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://contracts.example/v1/device_session_state.schema.json",
+  "title": "DeviceSessionState",
+  "description": "Snapshot of the glasses link as the companion sees it, published on every change (seq increases monotonically). Four independent lifecycles are reported separately rather than as one state chain, because the Meta Wearables Device Access Toolkit changes them independently: registration with the Meta AI app, the device session, the camera stream, and the platform's own conversation state. Values are platform names; GlassesBridge maps SDK enums onto them, so SDK changes never reach this contract. See docs/ARCHITECTURE_DECISION_LOG.md DEC-005.",
+  "type": "object",
+  "required": [
+    "schema", "session_id", "seq", "observed_at", "mode", "glasses_backend", "registration",
+    "device_availability", "device_session", "camera", "audio_route", "interaction",
+    "device_capabilities", "experimental_features", "degraded_reasons"
+  ],
+  "properties": {
+    "schema": { "const": "platform.device_session_state/v1" },
+    "session_id": { "$ref": "common.schema.json#/definitions/Ref" },
+    "seq": {
+      "description": "Monotonic per session. Consumers drop snapshots with a lower seq than the last one seen.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "observed_at": { "$ref": "common.schema.json#/definitions/Timestamp" },
+    "mode": {
+      "description": "glasses = the glasses are usable for this turn; phone_only = every interaction continues on the phone.",
+      "type": "string",
+      "enum": ["glasses", "phone_only"]
+    },
+    "glasses_backend": {
+      "description": "Which implementation GlassesBridge is running. Always explicit: a mock must never stand in silently for real hardware.",
+      "type": "string",
+      "enum": ["dat", "mock", "none"]
+    },
+    "registration": {
+      "description": "Registration of this app with the Meta AI app.",
+      "type": "string",
+      "enum": ["not_registered", "registering", "registered", "unavailable"]
+    },
+    "device_availability": {
+      "description": "Whether an eligible device is selected. update_required = the glasses need a firmware or on-glasses app update.",
+      "type": "string",
+      "enum": ["none", "available", "update_required"]
+    },
+    "device_session": {
+      "description": "Device session state. paused is device-driven and carries no reason; stopped is terminal and a new session must be created.",
+      "type": "string",
+      "enum": ["idle", "starting", "started", "paused", "stopping", "stopped"]
+    },
+    "camera": {
+      "title": "CameraState",
+      "type": "object",
+      "required": ["permission", "stream"],
+      "properties": {
+        "permission": {
+          "description": "Camera permission is granted in the Meta AI app, not through an OS dialog.",
+          "type": "string",
+          "enum": ["unknown", "denied", "granted_once", "granted_always"]
+        },
+        "stream": {
+          "type": "string",
+          "enum": ["stopped", "starting", "streaming", "paused", "stopping"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "audio_route": {
+      "description": "glasses_hfp = two-way narrow-band mono (mic + speech out); glasses_a2dp = output only; phone = phone mic/speaker; none = no usable audio.",
+      "type": "string",
+      "enum": ["glasses_hfp", "glasses_a2dp", "phone", "none"]
+    },
+    "interaction": {
+      "description": "The platform's conversation state, independent of the device lifecycles above.",
+      "type": "string",
+      "enum": ["idle", "listening", "processing", "speaking", "capture_pending", "awaiting_confirmation"]
+    },
+    "device_capabilities": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/definitions/DeviceCapability" }
+    },
+    "experimental_features": {
+      "description": "SDK features in use that the vendor marks experimental or preview. A non-empty list means this build cannot be published; each feature has a non-experimental fallback (DEC-004).",
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": ["voice_invocation", "inputs", "speech", "standalone_photo", "stream_audio", "motion", "display"]
+      }
+    },
+    "degraded_reasons": {
+      "description": "Why the experience is reduced. Empty when everything requested is available.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "NO_DEVICE", "NOT_REGISTERED", "META_AI_APP_MISSING", "DEVICE_UPDATE_REQUIRED", "SDK_UPDATE_REQUIRED",
+          "CAMERA_PERMISSION_DENIED", "MIC_PERMISSION_DENIED", "HINGES_CLOSED", "DOFFED", "THERMAL", "BATTERY_LOW",
+          "BLUETOOTH_ROUTE_UNAVAILABLE", "APP_BACKGROUNDED", "SESSION_STOPPED", "USER_CHOSE_PHONE"
+        ]
+      }
+    }
+  },
+  "allOf": [
+    {
+      "$comment": "phone_only must say why, so the UI can explain it and telemetry can count it.",
+      "if": { "properties": { "mode": { "const": "phone_only" } }, "required": ["mode"] },
+      "then": { "properties": { "degraded_reasons": { "minItems": 1 } } }
+    },
+    {
+      "$comment": "glasses mode needs a registered device and a real or explicitly mocked backend.",
+      "if": { "properties": { "mode": { "const": "glasses" } }, "required": ["mode"] },
+      "then": {
+        "properties": {
+          "registration": { "const": "registered" },
+          "glasses_backend": { "enum": ["dat", "mock"] },
+          "device_session": { "enum": ["starting", "started", "paused"] }
+        }
+      }
+    },
+    {
+      "$comment": "A camera stream only exists inside a started device session.",
+      "if": { "properties": { "camera": { "properties": { "stream": { "const": "streaming" } } } } },
+      "then": { "properties": { "device_session": { "const": "started" } } }
+    },
+    {
+      "$comment": "Capturing needs glasses mode, camera permission, and either an active stream (publishable path) or the experimental standalone photo API.",
+      "if": { "properties": { "interaction": { "const": "capture_pending" } }, "required": ["interaction"] },
+      "then": {
+        "properties": {
+          "mode": { "const": "glasses" },
+          "camera": { "properties": { "permission": { "enum": ["granted_once", "granted_always"] } } }
+        },
+        "anyOf": [
+          { "properties": { "camera": { "properties": { "stream": { "const": "streaming" } } } } },
+          { "properties": { "experimental_features": { "contains": { "const": "standalone_photo" } } } }
+        ]
+      }
+    },
+    {
+      "$comment": "Capabilities that are experimental in the SDK must be declared as such (DEC-004).",
+      "if": { "properties": { "device_capabilities": { "contains": { "const": "voice_invocation" } } } },
+      "then": { "properties": { "experimental_features": { "contains": { "const": "voice_invocation" } } } }
+    },
+    {
+      "if": { "properties": { "device_capabilities": { "contains": { "const": "inputs" } } } },
+      "then": { "properties": { "experimental_features": { "contains": { "const": "inputs" } } } }
+    },
+    {
+      "if": { "properties": { "device_capabilities": { "contains": { "const": "on_device_speech" } } } },
+      "then": { "properties": { "experimental_features": { "contains": { "const": "speech" } } } }
+    },
+    {
+      "if": { "properties": { "device_capabilities": { "contains": { "const": "audio_stream" } } } },
+      "then": { "properties": { "experimental_features": { "contains": { "const": "stream_audio" } } } }
+    }
+  ],
+  "patternProperties": { "^x_": {} },
+  "additionalProperties": false
+}

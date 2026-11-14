@@ -1,0 +1,14 @@
+{
+  "schema": "platform.error/v1",
+  "code": "PROPOSAL_EXPIRED",
+  "retryable": false,
+  "effect_state": "none",
+  "user_message": {
+    "en": "That suggestion expired. Ask again and I'll make a fresh one.",
+    "fi": "Ehdotus vanheni. Kysy uudelleen, niin teen uuden."
+  },
+  "correlation_id": "corr_8812",
+  "occurred_at": "2026-11-19T18:23:05+02:00",
+  "capability_id": "sbank.coach",
+  "degraded_to": "none"
+}

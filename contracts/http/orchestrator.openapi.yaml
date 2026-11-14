@@ -6,6 +6,8 @@ info:
     What the native companion app (and the phone-only fallback UI) calls. Domain-agnostic:
     nothing here mentions finance. The companion authenticates with a session cookie or bearer token;
     `user_ref` is always taken from the session, never trusted from the body.
+    Every non-2xx response body is a `platform.error/v1` ErrorEnvelope (DEC-008); SSE streams
+    end with an `event: error` carrying the same envelope if a turn fails mid-stream.
 servers:
   - url: https://platform.internal.example
 paths:
@@ -36,6 +38,27 @@ paths:
                 properties:
                   session_id: { $ref: "../schemas/v1/common.schema.json#/definitions/Ref" }
                   conversation_ref: { $ref: "../schemas/v1/common.schema.json#/definitions/Ref" }
+  /v1/sessions/{session_id}/device-state:
+    put:
+      summary: Publish the companion's latest glasses state (DEC-005)
+      description: |
+        Sent on every change. The server keeps the snapshot with the highest `seq` and uses it to choose
+        output modality (glasses audio, phone card, display) and to refuse captures the device cannot make.
+      parameters:
+        - { name: session_id, in: path, required: true, schema: { $ref: "../schemas/v1/common.schema.json#/definitions/Ref" } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "../schemas/v1/device_session_state.schema.json" }
+      responses:
+        "204":
+          description: Accepted (or ignored as stale because a higher `seq` is already stored)
+        "422":
+          description: Snapshot failed schema validation
+          content:
+            application/json:
+              schema: { $ref: "../schemas/v1/error_envelope.schema.json" }
   /v1/captures:
     post:
       summary: Upload a minimised capture (EXIF already stripped on the phone)
@@ -68,7 +91,10 @@ paths:
             application/json:
               schema: { $ref: "../schemas/v1/context_capture.schema.json" }
         "403":
-          description: No consent for this capture purpose
+          description: No consent for this capture purpose (`CONSENT_REQUIRED`)
+          content:
+            application/json:
+              schema: { $ref: "../schemas/v1/error_envelope.schema.json" }
   /v1/turns:
     post:
       summary: Send one user turn (voice, typed, or a glasses gesture)
@@ -115,3 +141,11 @@ paths:
               schema: { $ref: "../schemas/v1/action_result.schema.json" }
         "409":
           description: Proposal expired, already decided, or channel not allowed for this proposal
+          content:
+            application/json:
+              schema: { $ref: "../schemas/v1/error_envelope.schema.json" }
+        "503":
+          description: Offline or capability unavailable; confirmations are never queued
+          content:
+            application/json:
+              schema: { $ref: "../schemas/v1/error_envelope.schema.json" }

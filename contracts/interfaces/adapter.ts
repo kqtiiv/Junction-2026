@@ -2,11 +2,16 @@
 // capability. Hand-written (it describes behaviour, not data); every type it uses is
 // generated from schemas/v1.
 //
-// Implementations for S-Bank Coach (see docs/PLATFORM_ARCHITECTURE.md §3.11):
+// Implementations for S-Bank Coach (see docs/ARCHITECTURE.md §3.11):
 //   RemoteAgentBackend      HTTPS + SSE to the Coach team's POST /v1/turn (http/coach-agent.openapi.yaml)
-//   OnDeviceAgentBackend    in-process on the phone (Gemma 4 E2B, or FunctionGemma router + Gemma 3 1B)
+//   OnDeviceAgentBackend    in-process on the phone, any on-device model (choice is the domain's; see ModelProvider)
 //   DeterministicFastPath   intent → finance tool → template; offline mode and demo fallback
-// The platform cannot tell these apart, and must not try to.
+// The platform cannot tell these apart, and must not try to. No model, vendor or framework
+// name may appear in this interface or its types (DEC-010).
+//
+// Cancellation (DEC-011): `signal` aborts when the user says "stop" or barges in. Implementations
+// must stop emitting events, must not apply anything, and must propagate the abort to any remote
+// call they started. Pending proposals stay pending; they are never applied as a side effect of abort.
 
 import type {
   ActionResult,
@@ -21,6 +26,8 @@ export interface AdapterHealth {
   status: "ok" | "degraded" | "down";
   /** Opaque backend id, e.g. "remote_agent@0.4". Telemetry only. */
   backend: string;
+  /** True when a mock or fixture stands in for a real dependency. Never hidden (DEC-005). */
+  mock?: boolean;
 }
 
 export interface AgentOrchestratorAdapter {
