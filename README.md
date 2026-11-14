@@ -23,6 +23,8 @@ These screenshots come from CI, not a mock-up. The UI test runs the real iOS app
   </tr>
 </table>
 
+These screenshots were taken before the app was renamed, so their title still reads "S-Bank Coach". The app now shows "Spendtacles" (DEC-026), and the next CI run will refresh them.
+
 The dark strip under the title (`glasses: mock · mode: glasses · seq …`) is the debug overlay. It is there on purpose: **mocks are never silent** (DEC-005), so the app always shows when simulated glasses or fixture data are in play.
 
 ## Built to be trusted
@@ -49,7 +51,7 @@ The coach works without any bank data, and without a setup screen. The first tim
 
 ### The team's money engine on transaction data (`s_pankki`)
 
-The answers come from our teammate's deterministic money engine, run on the Junction 2026 synthetic transaction dataset ([`finance-engine/`](finance-engine/README.md), DEC-024). It answers per day until payday, the way the engine computes it (DEC-025, proposed):
+The answers come from our teammate's deterministic money engine, run on the Junction 2026 synthetic transaction dataset ([`finance-engine/`](finance-engine/README.md), DEC-024). It answers per day until payday, the way the engine computes it (DEC-025):
 
 > "What's safe to spend?" → "You can safely spend about 32 euros a day for the next 10 days, until payday."
 >
@@ -58,6 +60,7 @@ The answers come from our teammate's deterministic money engine, run on the Junc
 - The engine's floats become decimal strings at the boundary, and every figure gets a `calc_id` that the verifier resolves back through the engine service.
 - The dataset is synthetic history, so "today" is a fixed simulated date (2026-09-05). Every result says so.
 - The demo customer is CUST04069. A customer whose bills exceed their balance is told plainly that nothing is safe to spend.
+- We are still confirming with the organisers that teams outside the S-Pankki challenge may use this dataset. If not, `user_stated` becomes the demo source (DEC-026).
 
 ### Fixture (`fixture`, the default)
 
@@ -80,9 +83,11 @@ Fixed demo numbers (€90.16 safe to spend this week), reported as `mock` everyw
 | [`finance-engine/`](finance-engine/README.md) | HTTP service in front of the team's Python money engine: decimal strings, `calc_id`s, calculation lookups. Python, FastAPI. 10 tests. |
 | [`contracts/`](contracts/README.md) | Versioned JSON Schema contracts, valid/invalid examples as tests, generated TS/Swift/Kotlin/Python types, OpenAPI specs, the adapter interface |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Platform architecture |
-| [`docs/ARCHITECTURE_DECISION_LOG.md`](docs/ARCHITECTURE_DECISION_LOG.md) | 25 decisions (DEC-001 to DEC-025), each with alternatives, evidence and revisit triggers |
+| [`docs/ARCHITECTURE_DECISION_LOG.md`](docs/ARCHITECTURE_DECISION_LOG.md) | 26 decisions (DEC-001 to DEC-026), each with alternatives, evidence and revisit triggers |
 | [`docs/SOURCES.md`](docs/SOURCES.md), [`docs/adr/evidence/`](docs/adr/README.md) | Source register and research write-ups |
 | [`docs/finance/REFERENCE_DESIGN.md`](docs/finance/REFERENCE_DESIGN.md) | Finance-domain reference design |
+
+Some internal names still say S-Bank (`sbank.coach`, `SBankCoachAdapter`, `backend/src/capabilities/sbank-coach/`, the `s_pankki` source). They are kept until after the hackathon so the contracts don't change hours before judging (DEC-026). Older decision entries say "S-Bank Coach" for what is now the money coach.
 
 ## Run it
 
@@ -93,7 +98,7 @@ cd contracts && npm install && npm run check
 # Backend (fixture data, demo token)
 cd backend && npm install && npm test && npm run dev    # http://localhost:8787
 FINANCE_SOURCE=user_stated npm run dev                  # no bank data: the coach asks for a weekly amount
-FINANCE_SOURCE=s_pankki npm run dev                     # the team's engine (start finance-engine/ first, see its README)
+FINANCE_SOURCE=s_pankki npm run dev                     # the team's engine (start finance-engine/ first; FINANCE_ENGINE_URL, default :8790)
 curl -H 'authorization: Bearer demo-token' localhost:8787/health
 
 # iOS companion core (macOS or Linux): unit tests, then the end-to-end smoke test against the running backend
