@@ -241,7 +241,7 @@ public final class DATGlassesBridge: GlassesBridge {
         return try await photo.value(timeout: 6).data
     }
 
-    private func cameraPermission() async -> Permission {
+    private func cameraPermission() async -> Contracts.Permission {
         // The SDK reports only granted/denied; "once vs always" is not exposed.
         switch try? await Wearables.shared.checkPermissionStatus(.camera) {
         case .granted?: return .grantedOnce
