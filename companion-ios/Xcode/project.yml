@@ -51,7 +51,7 @@ targetTemplates:
     info:
       path: ${target_name}-Info.plist
       properties:
-        CFBundleDisplayName: S-Bank Coach
+        CFBundleDisplayName: Spendtacles
         UILaunchScreen: {}
         CFBundleURLTypes:
           - CFBundleURLName: $(PRODUCT_BUNDLE_IDENTIFIER)
@@ -70,7 +70,7 @@ targetTemplates:
         NSBluetoothPeripheralUsageDescription: Needed to connect to your Meta AI glasses.
         NSLocalNetworkUsageDescription: Lets your phone find your glasses and reach the coach on this network.
         NSBonjourServices: [_bonjour._tcp]
-        NSMicrophoneUsageDescription: So you can ask S-Bank Coach questions by voice.
+        NSMicrophoneUsageDescription: So you can ask Spendtacles questions by voice.
         NSSpeechRecognitionUsageDescription: To turn your question into text. Nothing is kept.
         NSAppTransportSecurity: { NSAllowsLocalNetworking: true }
         # Companion configuration
