@@ -39,7 +39,10 @@ public final class CompanionViewModel: ObservableObject {
 
     /// Starts once, however many callers ask (the screen's .task and connectGlasses may race).
     public func start() async {
-        if let startTask { return await startTask.value }
+        if let startTask {
+            await startTask.value
+            if started { return }   // a failed start (e.g. backend unreachable) may be retried
+        }
         let task = Task { await self.performStart() }
         startTask = task
         await task.value
@@ -70,7 +73,14 @@ public final class CompanionViewModel: ObservableObject {
         do {
             // Wait for the SDK's actual registration state; the Mock Device Kit starts registered,
             // and handing off to the Meta AI app (absent in the Simulator) would fail.
-            if await coordinator.reportedRegistration() != .registered { try await coordinator.bridge.startRegistration() }
+            if await coordinator.reportedRegistration() != .registered {
+                try await coordinator.bridge.startRegistration()
+                // Registration finishes in the Meta AI app and returns via a URL callback.
+                guard await coordinator.waitUntilRegistered() else {
+                    errorText = locale.hasPrefix("fi") ? "Rekisteröinti Meta AI -sovelluksessa ei valmistunut." : "Registration in the Meta AI app didn't finish."
+                    return
+                }
+            }
             try await coordinator.bridge.startSession()
             await coordinator.setAudioRoute(audio.currentRoute())
         } catch { show(error) }
@@ -107,16 +117,21 @@ public final class CompanionViewModel: ObservableObject {
         defer { busy = false }
         do {
             let outcome: TurnOutcome
-            if let pi = PlatformIntentGrammar.match(transcript.text) {
+            let pi = PlatformIntentGrammar.match(transcript.text)
+            // "no" / "confirm" only decide something when a proposal is actually waiting;
+            // otherwise they are ordinary answers for the coach.
+            let decides = (pi == .confirm || pi == .reject) && coordinator.pendingProposal != nil
+            if let pi, decides || (pi != .confirm && pi != .reject) {
                 switch pi {
                 case .confirm, .reject:
-                    outcome = try await coordinator.decide(pi, by: .voice(transcript))
+                    outcome = try await coordinator.decide(pi, by: invocation == .typed ? .typed(transcript) : .voice(transcript))
                     proposal = nil
+                    if !outcome.cards.isEmpty { cards = outcome.cards }
                 case .stop, .cancel:
                     speechOut.stop()
-                    outcome = try await coordinator.platformIntent(pi, transcript: transcript)
+                    outcome = try await coordinator.platformIntent(pi, transcript: transcript, invocation: invocation)
                 default:
-                    outcome = try await coordinator.platformIntent(pi, transcript: transcript)
+                    outcome = try await coordinator.platformIntent(pi, transcript: transcript, invocation: invocation)
                 }
             } else {
                 // The user starts every capture: only when they say "this…" and the glasses are usable.
@@ -132,7 +147,9 @@ public final class CompanionViewModel: ObservableObject {
     /// Phone tap: the default, always-available confirmation (DEC-007).
     public func confirmByTap(_ decision: PlatformIntent = .confirm) async {
         do {
-            apply(try await coordinator.decide(decision, by: .phoneTap(uiEventID: "ui_\(UUID().uuidString.prefix(8))")))
+            let outcome = try await coordinator.decide(decision, by: .phoneTap(uiEventID: "ui_\(UUID().uuidString.prefix(8))"))
+            apply(outcome)
+            if !outcome.cards.isEmpty { cards = outcome.cards }   // the updated week replaces the stale answer
             proposal = nil
         } catch { show(error) }
     }
@@ -141,7 +158,9 @@ public final class CompanionViewModel: ObservableObject {
     public func confirmByGesture(_ input: GlassesInput) async {
         guard coordinator.bridge.flags.inputs, proposal != nil else { return }
         do {
-            apply(try await coordinator.decide(.confirm, by: .glassesGesture(input)))
+            let outcome = try await coordinator.decide(.confirm, by: .glassesGesture(input))
+            apply(outcome)
+            if !outcome.cards.isEmpty { cards = outcome.cards }
             proposal = nil
         } catch { show(error) }
     }

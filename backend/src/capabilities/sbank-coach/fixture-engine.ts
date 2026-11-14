@@ -5,15 +5,7 @@
 // allowance remains, TIGHT if 0–25 %, EXCEEDS below zero, UNKNOWN in pace mode.
 import { loadExample, assertValid, type ToolResult } from "../../contracts.ts";
 import { eur, fromCents, toCents } from "../../sdk/money.ts";
-import type { UserScopedCalculationResolver } from "../../sdk/verifier.ts";
-
-export interface PlannedItem { label: string; amount: string; plannedAt: string }
-
-export interface AffordabilityInput {
-  amount: string;
-  priceSource: "basket" | "stated_amount" | "observation";
-  observationId?: string;
-}
+import { affordabilityResult, CalcLog, type AffordabilityInput, type FinanceEngine, type PlannedItem } from "./finance-engine.ts";
 
 type SafeToSpendResult = {
   safe_to_spend_week: { amount: string; currency: "EUR" };
@@ -24,31 +16,21 @@ type SafeToSpendResult = {
   shortfall?: { amount: string; currency: "EUR" };
 };
 
-export class FixtureFinanceEngine implements UserScopedCalculationResolver {
+export class FixtureFinanceEngine implements FinanceEngine {
+  readonly source = "fixture" as const;
   readonly mock = true;
   readonly version = "fixture-1.0.0";
   private readonly baseSts: ToolResult;
-  private readonly log = new Map<string, Map<string, ToolResult>>();
+  private readonly calcs = new CalcLog((r) => assertValid("finance/finance_tool_result", r));
   private readonly planned = new Map<string, PlannedItem[]>();
-  private counter = 0;
 
   constructor() {
     this.baseSts = loadExample<ToolResult>("valid/finance/tool_result.safe_to_spend.json");
     assertValid("finance/finance_tool_result", this.baseSts);
   }
 
-  private record(userRef: string, result: ToolResult): ToolResult {
-    assertValid("finance/finance_tool_result", result);
-    let userLog = this.log.get(userRef);
-    if (!userLog) this.log.set(userRef, (userLog = new Map()));
-    userLog.set(result.calc_id as string, result);
-    return result;
-  }
-
-  private nextId(prefix: string): string {
-    this.counter += 1;
-    return `calc_${prefix}_${this.counter.toString().padStart(3, "0")}`;
-  }
+  private record(userRef: string, result: ToolResult): ToolResult { return this.calcs.record(userRef, result); }
+  private nextId(prefix: string): string { return this.calcs.nextId(prefix); }
 
   plannedFor(userRef: string): PlannedItem[] {
     return this.planned.get(userRef) ?? [];
@@ -81,38 +63,7 @@ export class FixtureFinanceEngine implements UserScopedCalculationResolver {
 
   calculateAffordability(userRef: string, input: AffordabilityInput): { result: ToolResult; sts: ToolResult } {
     const sts = this.getSafeToSpend(userRef);
-    const stsWeek = (sts.result as SafeToSpendResult).safe_to_spend_week.amount;
-    const allowance = toCents(stsWeek);
-    const remaining = allowance - toCents(input.amount);
-    const verdict = remaining < 0n ? "EXCEEDS" : remaining * 4n >= allowance ? "FITS" : "TIGHT";
-
-    const assumptions = [...sts.assumptions];
-    if (input.priceSource === "observation") assumptions.unshift("Price read from the shelf label");
-    if (input.priceSource === "stated_amount") assumptions.unshift("Amount as stated by the user");
-
-    const result: ToolResult = {
-      schema: "platform.tool_result/v1",
-      ok: true,
-      calc_id: this.nextId("aff"),
-      tool: "finance.calculate_affordability",
-      tool_version: this.version,
-      epistemic: "estimate",
-      data_mode: sts.data_mode,
-      as_of: new Date().toISOString(),
-      result: {
-        amount_checked: eur(input.amount),
-        price_source: input.priceSource,
-        ...(input.observationId ? { observation_id: input.observationId } : {}),
-        verdict,
-        safe_to_spend_week: eur(stsWeek),
-        remaining_after: eur(fromCents(remaining)),
-      },
-      assumptions,
-      missing_data: [],
-      warnings: [],
-      confidence: sts.confidence ?? "medium",
-    };
-    return { result: this.record(userRef, result), sts };
+    return { result: this.record(userRef, affordabilityResult(sts, input, this.nextId("aff"), this.version)), sts };
   }
 
   addPlanned(userRef: string, item: Omit<PlannedItem, "plannedAt">): void {
@@ -120,6 +71,6 @@ export class FixtureFinanceEngine implements UserScopedCalculationResolver {
   }
 
   async resolve(userRef: string, calcId: string): Promise<ToolResult | null> {
-    return this.log.get(userRef)?.get(calcId) ?? null;
+    return this.calcs.resolve(userRef, calcId);
   }
 }

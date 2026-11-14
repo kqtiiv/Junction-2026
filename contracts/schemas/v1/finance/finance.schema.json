@@ -111,6 +111,14 @@
         },
         "shortfall": {
           "$ref": "../common.schema.json#/definitions/Money"
+        },
+        "stated_weekly_amount": {
+          "description": "The weekly amount the user said (user_stated source, no bank data). Shown as 'your figure'.",
+          "$ref": "../common.schema.json#/definitions/Money"
+        },
+        "planned_this_week": {
+          "description": "Confirmed plans counted against the stated weekly amount this week.",
+          "$ref": "../common.schema.json#/definitions/Money"
         }
       },
       "additionalProperties": false

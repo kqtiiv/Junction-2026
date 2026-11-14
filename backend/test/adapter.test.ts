@@ -61,7 +61,7 @@ test("agent that invents numbers: unverified speech and cards are dropped", asyn
 test("agent that answers with real calc_ids passes verification", async () => {
   const { app, engine } = makeApp();
   const grounded = (req: DomainRequest): DomainResponse => {
-    const sts = engine.getSafeToSpend(req.user_ref);
+    const sts = engine.getSafeToSpend(req.user_ref)!;
     return {
       schema: "platform.domain_response/v1", request_id: req.request_id, status: "answered",
       speech: { text: "Roughly 90 euros until Sunday, based on your balance.", epistemic: "estimate" },

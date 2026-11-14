@@ -36,7 +36,10 @@ public enum CaptureSource { case glasses, phoneCamera }
 public enum ConfirmMethod {
     case phoneTap(uiEventID: String)
     case glassesGesture(GlassesInput)
+    /// Spoken "confirm"/"vahvista": hands-free, held to the voice rules (exact word, ASR confidence).
     case voice(Transcript)
+    /// Typed into the phone: a phone confirmation, never recorded as a voice one.
+    case typed(Transcript)
 }
 
 public enum CompanionError: Error, Equatable {
@@ -85,6 +88,13 @@ public final class CompanionCoordinator {
             for await event in events {
                 guard let self, let tracker = self.tracker else { return }
                 if tracker.apply(event) { await self.publishDeviceState() }
+                if event == .session(.paused) {
+                    // Nothing else may happen while the glasses are off: re-check once the pause limit passes.
+                    Task { [weak self] in
+                        try? await Task.sleep(nanoseconds: UInt64((DeviceStateTracker.pauseLimit + 1) * 1_000_000_000))
+                        await self?.publishDeviceState()
+                    }
+                }
             }
         }
         await bridge.configure()
@@ -105,6 +115,16 @@ public final class CompanionCoordinator {
             try? await Task.sleep(nanoseconds: 50_000_000)
         }
         return tracker?.reportedRegistration()
+    }
+
+    /// Waits until registration completes (it finishes in the Meta AI app, via a URL callback).
+    public func waitUntilRegistered(timeout: TimeInterval = 120) async -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if tracker?.reportedRegistration() == .registered { return true }
+            try? await Task.sleep(nanoseconds: 250_000_000)
+        }
+        return tracker?.reportedRegistration() == .registered
     }
 
     public func setAudioRoute(_ route: AudioRoute) async {
@@ -132,6 +152,19 @@ public final class CompanionCoordinator {
     public func ask(_ transcript: Transcript, invocation: Invocation = .phonePushToTalk,
                     capture: CaptureSource? = nil, purpose: String = "price_label",
                     phonePhoto: Data? = nil) async throws -> TurnOutcome {
+        do {
+            return try await askOnce(transcript, invocation: invocation, capture: capture, purpose: purpose, phonePhoto: phonePhoto)
+        } catch {
+            // Capture, upload or turn failed: don't leave the device state stuck in capture_pending/processing.
+            let next: Interaction = pendingProposal != nil ? .awaitingConfirmation : .idle
+            tracker?.mutate { $0.interaction = next }
+            await publishDeviceState()
+            throw error
+        }
+    }
+
+    private func askOnce(_ transcript: Transcript, invocation: Invocation, capture: CaptureSource?,
+                         purpose: String, phonePhoto: Data?) async throws -> TurnOutcome {
         guard let session, let tracker else { throw CompanionError.notStarted }
         var captureIDs: [String] = []
         if let capture {
@@ -182,6 +215,7 @@ public final class CompanionCoordinator {
                 let result = try await client.confirm(proposalID: proposal.proposalID, decision: decisionWord,
                                                       channel: .phoneTap, evidence: ["ui_event_id": uiEventID])
                 let fi = config.locale.hasPrefix("fi")
+                if let card = result.card { outcome.cards = [card] }   // the updated week replaces the stale answer
                 switch result.status {
                 case .applied: outcome.speech = fi ? "Tehty. Voit perua sen puhelimessa." : "Done. You can undo it on your phone."
                 case .rejectedByUser: outcome.speech = fi ? "Selvä, en tee sitä." : "OK, I won't."
@@ -189,21 +223,25 @@ public final class CompanionCoordinator {
                 }
             } catch OrchestratorError.api(let env, _) {
                 outcome.error = env
+                outcome.speech = OrchestratorError.api(env, status: 0).userMessage(locale: config.locale)
             }
         case .glassesGesture(let input):
             outcome = try await runTurn(intent(transcript: nil, invocation: .glassesInput, input: input, platformIntent: decision))
         case .voice(let transcript):
             outcome = try await runTurn(intent(transcript: transcript, invocation: .phonePushToTalk, platformIntent: decision))
+        case .typed(let transcript):
+            outcome = try await runTurn(intent(transcript: transcript, invocation: .typed, platformIntent: decision))
         }
-        if outcome.error == nil { pendingProposal = nil }
+        // Only a decided proposal is finished; an aborted turn left it pending on the backend.
+        if outcome.error == nil, !outcome.aborted { pendingProposal = nil }
         tracker?.mutate { $0.interaction = .idle }
         await publishDeviceState()
         return outcome
     }
 
     /// Platform intents other than confirm/reject (stop, repeat, show on phone, next card).
-    public func platformIntent(_ pi: PlatformIntent, transcript: Transcript? = nil) async throws -> TurnOutcome {
-        try await runTurn(intent(transcript: transcript, invocation: transcript == nil ? .typed : .phonePushToTalk, platformIntent: pi))
+    public func platformIntent(_ pi: PlatformIntent, transcript: Transcript? = nil, invocation: Invocation? = nil) async throws -> TurnOutcome {
+        try await runTurn(intent(transcript: transcript, invocation: invocation ?? (transcript == nil ? .typed : .phonePushToTalk), platformIntent: pi))
     }
 
     // MARK: Internals

@@ -16,6 +16,8 @@ public enum GlassesEvent: Equatable {
     case input(GlassesInputKind, deviceEventID: String)
     /// The session or stream ended for a reason the companion must surface.
     case degraded(DegradedReason)
+    /// A transient condition cleared (e.g. the glasses cooled down).
+    case recovered(DegradedReason)
 }
 
 public enum GlassesError: Error, Equatable {

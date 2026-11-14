@@ -4,7 +4,7 @@ Implements `contracts/http/orchestrator.openapi.yaml` (L3) and the S-Bank Coach 
 
 ```bash
 npm install
-npm test            # 39 tests: demo path, captures, consent, confirmation rules, abort, timeout fallback, invented numbers
+npm test            # 48 tests: demo path, captures, consent, confirmation rules, abort, timeout fallback, invented numbers
 npm run typecheck
 npm run dev         # http://0.0.0.0:8787  (phone on the same network can reach it)
 ```
@@ -39,6 +39,21 @@ The **label reader is a fixture** too: it returns the demo €79.90 label whatev
 
 Numbers come from `contracts/examples` (€90.16 safe to spend). Every spoken number and card value is verified against the engine's calculation log before it is sent. A remote agent that invents numbers has them dropped (`test/adapter.test.ts`).
 
+## Without bank data (`FINANCE_SOURCE=user_stated`)
+
+Built for a lazy user: no setup screen. The first time a question needs money figures, the coach asks one thing out loud and then answers the original question:
+
+> "Does this fit my week?" → "How much do you want to spend until Sunday?" → "About a hundred." → "Got it: 100 euros until Sunday. If the label's right, that leaves about 20. Want me to plan it in?"
+
+- Answers can be digits or round number words in English and Finnish ("about a hundred", "noin sata").
+- An unclear answer gets one retry, then the coach drops the question politely and never guesses.
+- The amount carries over to later weeks automatically. Saying "my budget this week is 60" changes it.
+- Confirmed plans count down from it.
+- Cards label it "Your weekly amount, as you told me" and note that no bank is connected (`data_mode: budget`, missing `NO_BALANCE`).
+- These are the user's own figures, so they are not reported as a mock.
+
+Stating the weekly amount is treated as the user giving information, not as an action taken on their behalf. The coach repeats it back instead of asking for a confirmation tap.
+
 ## Not built yet
 
 - A real label reader (cloud vision model or on-device OCR) behind the `LabelReader` / `vision_ocr` slot.
@@ -50,5 +65,6 @@ Numbers come from `contracts/examples` (€90.16 safe to spend). Every spoken nu
 | Env var | Default | Meaning |
 |---|---|---|
 | `PORT` | `8787` | |
+| `FINANCE_SOURCE` | `fixture` | `fixture`: S-Bank demo numbers (mock). `user_stated`: no bank data; the coach asks for the user's weekly amount once, when first needed |
 | `DEV_TOKENS` | `demo-token:u_7f3a` | Hackathon auth: `token:user_ref,…` |
 | `PLATFORM_SIGNING_KEY_PEM` | ephemeral key | P-256 private key for signing confirmations |

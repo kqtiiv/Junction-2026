@@ -101,11 +101,18 @@ public final class DATGlassesBridge: GlassesBridge {
         let same = lock.withLock { observedDevice == id && deviceStateToken != nil }
         if same { return }
         // Hinges closed forces the session to `stopped` (terminal); thermal limits pause it.
+        // Thermal is reported on changes only, including recovery, so phone_only can end.
+        let wasHot = Box<Bool>()
         let token = device.addDeviceStateListener { state in
             if state.hingeState == .closed { c.yield(.degraded(.hingesClosed)) }
+            let hot: Bool
             switch state.thermalLevel {
-            case .severe, .critical, .emergency, .shutdown: c.yield(.degraded(.thermal))
-            default: break
+            case .severe, .critical, .emergency, .shutdown: hot = true
+            default: hot = false
+            }
+            if wasHot.get() != hot {
+                wasHot.set(hot)
+                c.yield(hot ? .degraded(.thermal) : .recovered(.thermal))
             }
         }
         let old = swapDeviceToken(token, device: id)
@@ -133,6 +140,9 @@ public final class DATGlassesBridge: GlassesBridge {
     // MARK: Device session (subscribe before start; `stopped` is terminal)
 
     public func startSession() async throws {
+        // Stop a previous session first: dropping the reference alone leaves it running on the device.
+        let previous = lock.withLock { session }
+        previous?.stop()
         teardownSession(ifGeneration: nil)
         let s: MWDATCore.DeviceSession
         do { s = try Wearables.shared.createSession(deviceSelector: selector) }
@@ -172,7 +182,11 @@ public final class DATGlassesBridge: GlassesBridge {
         lock.withLock { sessionObservers += [stateObserver, errorObserver] }
 
         if flags.voiceInvocation { await startVoiceInvocation(deviceID: s.deviceId) }   // register before start
-        do { try s.start() } catch { throw GlassesError.unavailable("session start: \(error)") }
+        do { try s.start() } catch {
+            s.stop()
+            teardownSession(ifGeneration: gen)   // don't keep a failed session and its observers
+            throw GlassesError.unavailable("session start: \(error)")
+        }
         if flags.inputs { startInputs(on: s) }
         continuation.yield(.camera(permission: await cameraPermission(), stream: .stopped))
     }

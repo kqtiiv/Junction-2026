@@ -47,3 +47,47 @@ export function parseSpokenAmount(text: string): string | null {
   const cents = (m[2] ?? "0").padEnd(2, "0");
   return `${BigInt(m[1]!)}.${cents}`;
 }
+
+// Number words for answers to "how much?". Round amounts only; anything else is asked again.
+const WORDS: Record<string, number> = {
+  // English
+  ten: 10, twenty: 20, thirty: 30, forty: 40, fifty: 50, sixty: 60, seventy: 70, eighty: 80, ninety: 90,
+  "a hundred": 100, "one hundred": 100, hundred: 100, "a hundred and fifty": 150, "one hundred and fifty": 150,
+  "two hundred": 200, "two hundred and fifty": 250, "three hundred": 300, "four hundred": 400, "five hundred": 500,
+  // Finnish
+  kymmenen: 10, kaksikymmentä: 20, kolmekymmentä: 30, neljäkymmentä: 40, viisikymmentä: 50,
+  kuusikymmentä: 60, seitsemänkymmentä: 70, kahdeksankymmentä: 80, yhdeksänkymmentä: 90,
+  sata: 100, satakuusikymmentä: 160, sataviisikymmentä: 150, kaksisataa: 200, kaksisataaviisikymmentä: 250,
+  kolmesataa: 300, neljäsataa: 400, viisisataa: 500,
+};
+
+// Words around an amount that don't change it ("about 100 euros a week", "noin sata euroa").
+const FILLERS = [
+  "i guess", "i think", "let's say", "lets say", "per week", "a week", "this week", "for the week", "until sunday",
+  "maybe", "about", "around", "roughly", "approximately", "like", "say", "it's", "its", "is", "to", "be", "should",
+  "euros", "euro", "eur",
+  "tällä viikolla", "sunnuntaihin asti", "viikossa", "noin", "ehkä", "suunnilleen", "sanotaan", "vaikka", "on", "euroa", "n",
+];
+const FILLER_RE = new RegExp(`(^|\\s)(${FILLERS.map((f) => f.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})(?=\\s|$)`, "g");
+
+/**
+ * Parses an answer to "how much do you want to spend until Sunday?". Strict on purpose: after
+ * removing filler words, the WHOLE answer must be an amount ("100", "about 100 euros",
+ * "noin sata", "80,50 €", "1 000"). Sentences that merely contain a number ("give me 5 minutes",
+ * "can I afford 30?") are not answers. Returns a contract decimal string or null.
+ */
+export function parseBudgetAnswer(text: string): string | null {
+  let t = text.toLowerCase().normalize("NFC")
+    .replace(/(\d)[\s ](?=\d{3}\b)/g, "$1")      // "1 000" → "1000"
+    .replace(/€/g, " ")
+    .replace(/(\d)e\b/g, "$1")                          // "80e"
+    .replace(/[!?;:]+/g, " ")
+    .replace(/[.,](?!\d)/g, " ");                       // sentence punctuation, keeping "80,50"
+  let prev;
+  do { prev = t; t = t.replace(FILLER_RE, " "); } while (t !== prev);
+  t = t.replace(/\s+/g, " ").trim();
+  const digits = /^(\d{1,6})(?:[.,](\d{1,2}))?$/.exec(t);
+  if (digits) return `${BigInt(digits[1]!)}.${(digits[2] ?? "0").padEnd(2, "0")}`;
+  const n = WORDS[t];
+  return n === undefined ? null : `${n}.00`;
+}

@@ -60,6 +60,7 @@ public final class DeviceStateTracker {
             cameraPermission = permission
             stream = st
         case .degraded(let reason): sticky.insert(reason)
+        case .recovered(let reason): sticky.remove(reason)
         case .launchApp, .input: return false
         }
         return true

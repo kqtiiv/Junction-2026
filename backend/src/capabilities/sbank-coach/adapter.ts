@@ -11,10 +11,10 @@ import { PlatformError } from "../../errors.ts";
 import { verifyResponse } from "../../sdk/verifier.ts";
 import type { AgentBackend } from "./backend.ts";
 import { CAPABILITY_ID, type DeterministicFastPath } from "./fast-path.ts";
-import type { FixtureFinanceEngine } from "./fixture-engine.ts";
+import type { FinanceEngine } from "./finance-engine.ts";
 
 export interface SBankCoachAdapterOptions {
-  engine: FixtureFinanceEngine;
+  engine: FinanceEngine;
   fastPath: DeterministicFastPath;
   /** The Coach team's agent. Absent until their endpoint exists; the fast path answers meanwhile. */
   remote?: AgentBackend;

@@ -26,8 +26,20 @@ final class GrammarTests: XCTestCase {
 
     func testCaptureKeywords() {
         XCTAssertTrue(PlatformIntentGrammar.wantsCapture("does this fit"))
+        XCTAssertTrue(PlatformIntentGrammar.wantsCapture("does this fit my week"))
         XCTAssertTrue(PlatformIntentGrammar.wantsCapture("mahtuuko tämä"))
+        XCTAssertTrue(PlatformIntentGrammar.wantsCapture("scan the receipt"))
+        XCTAssertTrue(PlatformIntentGrammar.wantsCapture("får den här plats"))
         XCTAssertFalse(PlatformIntentGrammar.wantsCapture("what's safe to spend"))
+    }
+
+    /// Review finding: the demo's main question took an unrequested photo.
+    func testTimePhrasesNeverTriggerACapture() {
+        XCTAssertFalse(PlatformIntentGrammar.wantsCapture("what's safe to spend this week"))
+        XCTAssertFalse(PlatformIntentGrammar.wantsCapture("how much did I spend this month"))
+        XCTAssertFalse(PlatformIntentGrammar.wantsCapture("paljonko voin käyttää tällä viikolla"))
+        XCTAssertFalse(PlatformIntentGrammar.wantsCapture("hur mycket har jag kvar den här veckan"))
+        XCTAssertFalse(PlatformIntentGrammar.wantsCapture("det är dyrt"), "Swedish 'det' alone is not a capture")
     }
 }
 
@@ -125,6 +137,15 @@ final class DeviceStateTrackerTests: XCTestCase {
         XCTAssertTrue(snap.degradedReasons.contains(.sessionStopped))
         t.apply(.session(.starting)); t.apply(.session(.started))
         XCTAssertEqual(t.snapshot().mode, .glasses, "a new session recovers")
+    }
+
+    func testThermalRecoveryEndsPhoneOnly() {
+        let t = DeviceStateTracker(sessionID: "s", bridge: MockGlassesBridge())
+        t.apply(.registration(.registered)); t.apply(.availability(.available)); t.apply(.session(.started))
+        t.apply(.degraded(.thermal))
+        XCTAssertEqual(t.snapshot().mode, .phoneOnly)
+        t.apply(.recovered(.thermal))
+        XCTAssertEqual(t.snapshot().mode, .glasses, "cooled down: back to glasses without a new session")
     }
 
     func testLongPauseDropsToPhone() {

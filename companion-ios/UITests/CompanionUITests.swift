@@ -34,6 +34,9 @@ final class CompanionUITests: XCTestCase {
         screenshot(app, "4-confirm-sheet")
         confirm.tap()
         XCTAssertTrue(element(app, containing: "Done.").waitForExistence(timeout: 20), "plan confirmed")
+        // The stale answer card is replaced by the updated week (review fix).
+        XCTAssertTrue(element(app, containing: "Safe to spend this week").waitForExistence(timeout: 10), "updated card shown")
+        XCTAssertFalse(element(app, containing: "Does it fit this week").exists, "stale answer card replaced")
         screenshot(app, "5-confirmed")
     }
 

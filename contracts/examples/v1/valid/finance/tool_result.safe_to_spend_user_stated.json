@@ -1,0 +1,42 @@
+{
+  "schema": "platform.tool_result/v1",
+  "ok": true,
+  "calc_id": "calc_sts_007",
+  "tool": "finance.get_safe_to_spend",
+  "tool_version": "user-stated-1.0.0",
+  "epistemic": "calculated",
+  "data_mode": "budget",
+  "as_of": "2026-11-19T17:52:07+02:00",
+  "result": {
+    "safe_to_spend_week": {
+      "amount": "20.10",
+      "currency": "EUR"
+    },
+    "flexible_until_payday": {
+      "amount": "20.10",
+      "currency": "EUR"
+    },
+    "days_left_in_week": 4,
+    "days_to_income": 4,
+    "next_income_date": null,
+    "stated_weekly_amount": {
+      "amount": "100.00",
+      "currency": "EUR"
+    },
+    "planned_this_week": {
+      "amount": "79.90",
+      "currency": "EUR"
+    }
+  },
+  "assumptions": [
+    "Weekly amount as you told me: 100.00 EUR"
+  ],
+  "missing_data": [
+    {
+      "code": "NO_BALANCE",
+      "detail": "No bank connection; using the amount you gave"
+    }
+  ],
+  "warnings": [],
+  "confidence": "medium"
+}

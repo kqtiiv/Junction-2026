@@ -21,6 +21,12 @@ enum Display {
         return f.string(from: NSDecimalNumber(string: m.amount)) ?? "€\(m.amount)"
     }
 
+    /// Detail values that are plain decimals ("90.16") are money: format them like card values.
+    static func detail(_ s: String, locale: String) -> String {
+        s.range(of: #"^-?\d+\.\d{2}$"#, options: .regularExpression) != nil
+            ? money(Money(amount: s, currency: .eur), locale: locale) : s
+    }
+
     static func value(_ v: Value, locale: String) -> String {
         switch v {
         case .money(let m): return money(m, locale: locale)
@@ -120,8 +126,8 @@ public struct ProposalSheet: View {
                 HStack {
                     Text(Display.text(d.label, locale: locale))
                     Spacer()
-                    if let before = d.before { Text(before).strikethrough().foregroundStyle(.secondary) }
-                    Text(d.after).bold()
+                    if let before = d.before { Text(Display.detail(before, locale: locale)).strikethrough().foregroundStyle(.secondary) }
+                    Text(Display.detail(d.after, locale: locale)).bold()
                 }
             }
             if proposal.reversible { Text("You can undo this later.").font(.caption).foregroundStyle(.secondary) }
@@ -209,6 +215,13 @@ public struct CompanionScreen: View {
                     }
                     .padding()
                 }
+                .safeAreaInset(edge: .top, spacing: 0) {
+                    if showDebug {
+                        DebugOverlay(state: model.deviceState, glassesBackend: model.glassesBackend, debug: model.debug)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal)
+                    }
+                }
                 .safeAreaInset(edge: .bottom) { controls }
                 .navigationTitle("S-Bank Coach")
                 .toolbar {
@@ -220,9 +233,6 @@ public struct CompanionScreen: View {
                             Toggle("Debug overlay", isOn: $showDebug)
                         } label: { Image(systemName: "ellipsis.circle") }.accessibilityIdentifier("menu")
                     }
-                }
-                .overlay(alignment: .topLeading) {
-                    if showDebug { DebugOverlay(state: model.deviceState, glassesBackend: model.glassesBackend, debug: model.debug).padding(.top, 4) }
                 }
                 .sheet(item: Binding(get: { model.proposal.map(Identified.init) }, set: { if $0 == nil { model.dismissProposal() } })) { item in
                     ProposalSheet(proposal: item.value, locale: locale) { decision in Task { await model.confirmByTap(decision) } }

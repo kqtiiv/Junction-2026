@@ -5,25 +5,52 @@ import type {
   ActionProposal, ActionResult, DomainRequest, DomainResponse, InsightCard, LText, Observation, ToolResult, UserConfirmation,
 } from "../../contracts.ts";
 import { payloadHash, verifyJws } from "../../crypto.ts";
-import { formatAmount, parseSpokenAmount, roundEuros } from "../../sdk/money.ts";
+import { formatAmount, parseBudgetAnswer, parseSpokenAmount, roundEuros, toCents } from "../../sdk/money.ts";
 import type { AgentBackend } from "./backend.ts";
-import type { FixtureFinanceEngine } from "./fixture-engine.ts";
+import type { FinanceEngine } from "./finance-engine.ts";
 
 export const CAPABILITY_ID = "sbank.coach";
 const PROPOSAL_TTL_MS = 10 * 60 * 1000;
 const PLAN_CHANNELS: ActionProposal["confirm_channels"] = ["phone_tap", "glasses_gesture", "voice_readback"];
+/** How long the coach waits for the answer to its one question. */
+const PENDING_TTL_MS = 10 * 60 * 1000;
 
 type Intent =
   | { kind: "safe_to_spend" }
   | { kind: "affordability"; amount: string | null; source: "stated_amount" | "observation"; observation?: Observation; label?: string }
   | { kind: "price_check_needed"; observation: Observation }
+  | { kind: "set_budget"; amount: string }
   | { kind: "unsupported" };
+
+/** The original question, kept while the coach waits for the user's weekly amount. */
+interface Pending {
+  intent: "safe_to_spend" | "affordability";
+  utterance: string | null;
+  observations: Observation[];
+  amount?: string;
+  source?: "stated_amount" | "observation";
+  /** The observation the price came from (not just the first one attached). */
+  observation?: Observation;
+  label?: string;
+  askedAt: number;
+  retries: number;
+}
 
 const AFFORD = /\b(afford|fits?\b.*\b(week|budget)|fit this|can i buy)\b|mahtuu|varaa|budjettiin|har jag råd/i;
 const SAFE = /\b(safe to spend|how much can i spend|left to spend|spend this week|my week)\b|paljonko voin käyttää|käyttövara|paljonko minulla on käytettävissä/i;
 
+// Explicit budget phrasing only: "my budget this week is 80", "set my budget to 80", "budjettini on 80".
+// (Not "I have…" / "minulla on…": those start ordinary questions.)
+const SET_BUDGET = /\b(my (weekly )?budget|weekly budget|set (my )?budget|budget for (this|the) week)\b|budjettini|viikkobudjetti|viikkobudjettini/i;
+
+const ASK_AMOUNT = { en: "How much do you want to spend until Sunday?", fi: "Paljonko haluat käyttää sunnuntaihin asti?" };
+
 export function classify(utterance: string | null, observations: Observation[]): Intent {
   const text = utterance ?? "";
+  if (SET_BUDGET.test(text) && !AFFORD.test(text) && !SAFE.test(text)) {
+    const amount = parseBudgetAnswer(text.replace(SET_BUDGET, " "));
+    if (amount) return { kind: "set_budget", amount };
+  }
   const priced = observations.flatMap((o) => o.items.filter((i) => i.price).map((i) => ({ o, i })));
   if (AFFORD.test(text) || (priced.length > 0 && /\b(this|it)\b|tämä|se\b/i.test(text))) {
     const first = priced[0];
@@ -39,8 +66,14 @@ export function classify(utterance: string | null, observations: Observation[]):
 
 const isFi = (locale: string) => locale.startsWith("fi");
 const pick = (locale: string, t: { en: string; fi: string }) => (isFi(locale) ? t.fi : t.en);
-/** Untrusted label text: strip control characters and cap the length. Never spoken. */
-const safeLabel = (s: string | undefined) => (s ?? "").replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, 40);
+/**
+ * Untrusted label text: strip control characters, cap the length, and turn shelf-label
+ * capitals into sentence case ("LANGATTOMAT KUULOKKEET" → "Langattomat kuulokkeet"). Never spoken.
+ */
+const safeLabel = (s: string | undefined) => {
+  const t = (s ?? "").replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 40);
+  return t === t.toUpperCase() && /\p{L}/u.test(t) ? t.charAt(0) + t.slice(1).toLowerCase() : t;
+};
 
 type Money = { amount: string; currency: "EUR" };
 
@@ -48,22 +81,85 @@ export class DeterministicFastPath implements AgentBackend {
   readonly id = "fast_path@1";
   readonly mock: boolean;
   private readonly payloads = new Map<string, { userRef: string; hash: string; payload: { kind: string; label: string; amount: string } }>();
+  private readonly pending = new Map<string, Pending>();
 
-  constructor(private readonly engine: FixtureFinanceEngine, private readonly platformPublicKey: KeyObject) {
+  constructor(private readonly engine: FinanceEngine, private readonly platformPublicKey: KeyObject) {
     this.mock = engine.mock;
   }
 
+  private static key(req: DomainRequest): string {
+    return `${req.user_ref}:${req.session_id}`;
+  }
+
+  /** Drops questions nobody answered, so abandoned sessions don't pile up in memory. */
+  private sweepPending(now = Date.now()): void {
+    for (const [k, p] of this.pending) if (now - p.askedAt > PENDING_TTL_MS) this.pending.delete(k);
+  }
+
   supports(req: DomainRequest): boolean {
-    return classify(req.utterance, req.observations).kind !== "unsupported";
+    if (this.engine.stated && this.pending.has(DeterministicFastPath.key(req))) return true;   // an answer to our question
+    const kind = classify(req.utterance, req.observations).kind;
+    if (kind === "set_budget") return this.engine.stated !== undefined;
+    return kind !== "unsupported";
   }
 
   async healthy(): Promise<boolean> { return true; }
 
+  /** Asks the one question and remembers what it was for. */
+  private askForWeeklyAmount(req: DomainRequest, spec: Omit<Pending, "askedAt" | "retries" | "utterance" | "observations">): DomainResponse {
+    this.pending.set(DeterministicFastPath.key(req), {
+      ...spec, utterance: req.utterance, observations: req.observations, askedAt: Date.now(), retries: 0,
+    });
+    return this.reply(req, "clarify", pick(req.locale, ASK_AMOUNT), "fact");
+  }
+
   async turn(req: DomainRequest): Promise<DomainResponse> {
-    const intent = classify(req.utterance, req.observations);
     const l = req.locale;
+    const key = DeterministicFastPath.key(req);
+    this.sweepPending();
+    const intent = classify(req.utterance, req.observations);
+
+    // The coach asked "how much until Sunday?" and is waiting for the answer.
+    const p = this.engine.stated ? this.pending.get(key) : undefined;
+    if (p && this.engine.stated) {
+      const isNewQuestion = intent.kind === "safe_to_spend" || intent.kind === "affordability" || intent.kind === "price_check_needed";
+      const amount = intent.kind === "set_budget" ? intent.amount : isNewQuestion ? null : parseBudgetAnswer(req.utterance ?? "");
+      if (amount) {
+        this.pending.delete(key);
+        this.engine.stated.set(req.user_ref, amount);
+        const original: DomainRequest = { ...req, utterance: p.utterance, observations: p.observations };
+        return p.intent === "safe_to_spend"
+          ? this.safeToSpend(original, amount)
+          : this.affordability(original, p.amount!, p.source!, p.observation, p.label, amount);
+      }
+      if (!isNewQuestion && p.retries < 1) {
+        p.retries += 1;
+        return this.reply(req, "clarify", pick(l, { en: "Sorry, how many euros until Sunday?", fi: "Anteeksi, montako euroa sunnuntaihin asti?" }), "fact");
+      }
+      this.pending.delete(key);   // they moved on, or didn't know: drop the question, never guess
+      if (!isNewQuestion) {
+        return this.reply(req, "answered", pick(l, { en: "No problem. Ask me again any time.", fi: "Ei haittaa. Kysy uudelleen milloin vain." }), "fact");
+      }
+    }
+
+    // No bank data and no weekly amount yet: ask once, at the moment it matters.
+    if (this.engine.stated && !this.engine.stated.has(req.user_ref)) {
+      if (intent.kind === "safe_to_spend") return this.askForWeeklyAmount(req, { intent: "safe_to_spend" });
+      if (intent.kind === "affordability" && intent.amount) {
+        return this.askForWeeklyAmount(req, {
+          intent: "affordability", amount: intent.amount, source: intent.source,
+          ...(intent.observation ? { observation: intent.observation } : {}),
+          ...(intent.label ? { label: intent.label } : {}),
+        });
+      }
+    }
+
     switch (intent.kind) {
       case "safe_to_spend": return this.safeToSpend(req);
+      case "set_budget":
+        if (!this.engine.stated) break;
+        this.engine.stated.set(req.user_ref, intent.amount);
+        return this.safeToSpend(req, intent.amount, "set");
       case "affordability":
         if (!intent.amount) {
           return this.reply(req, "clarify", pick(l, { en: "How much does it cost?", fi: "Paljonko se maksaa?" }), "fact");
@@ -75,11 +171,12 @@ export class DeterministicFastPath implements AgentBackend {
           fi: "En saanut hintaa luettua kunnolla. Kerrotko hinnan?",
         }), "observed");
       default:
-        return this.reply(req, "unsupported", pick(l, {
-          en: "I can't answer that yet. Try asking what's safe to spend this week.",
-          fi: "En osaa vielä vastata siihen. Kysy esimerkiksi, paljonko voit käyttää tällä viikolla.",
-        }), "fact");
+        break;
     }
+    return this.reply(req, "unsupported", pick(l, {
+      en: "I can't answer that yet. Try asking what's safe to spend this week.",
+      fi: "En osaa vielä vastata siihen. Kysy esimerkiksi, paljonko voit käyttää tällä viikolla.",
+    }), "fact");
   }
 
   private reply(req: DomainRequest, status: DomainResponse["status"], text: string, epistemic: DomainResponse["speech"]["epistemic"],
@@ -101,42 +198,97 @@ export class DeterministicFastPath implements AgentBackend {
     };
   }
 
-  private safeToSpend(req: DomainRequest): DomainResponse {
-    const sts = this.engine.getSafeToSpend(req.user_ref);
-    const r = sts.result as { safe_to_spend_week: Money; flexible_until_payday: Money; days_left_in_week: number };
+  /** Spoken form of a weekly amount: "100" for round euros, "80.50" / "80,50" otherwise. */
+  private static said(amount: string, locale: string): string {
+    return toCents(amount) % 100n === 0n ? (toCents(amount) / 100n).toString() : formatAmount(amount, locale);
+  }
+
+  private static readonly NO_BANK: LText = { en: "No bank connected: using the amount you gave", fi: "Pankkia ei ole yhdistetty: käytän kertomaasi summaa" };
+
+  /** The safe-to-spend card, built straight from the engine result (also sent back after a confirmation). */
+  private stsCard(sts: ToolResult): InsightCard {
+    const r = sts.result as { safe_to_spend_week: Money; flexible_until_payday: Money; days_left_in_week: number;
+      stated_weekly_amount?: Money; planned_this_week?: Money };
     const n = roundEuros(r.safe_to_spend_week.amount).toString();
-    const text = pick(req.locale, {
-      en: `About ${n} euros is safe to spend through Sunday. That's an estimate from your balance and bills before payday.`,
-      fi: `Tällä viikolla voit käyttää noin ${n} euroa sunnuntaihin asti. Arvio perustuu saldoosi ja laskuihin ennen palkkapäivää.`,
-    });
+    const stated = this.engine.source === "user_stated";
+    const kind = stated ? "calculated" : "estimate";
     const card: InsightCard = {
       schema: "platform.insight_card/v1",
       card_id: `card_${sts.calc_id}`,
       capability_id: CAPABILITY_ID,
       type: "metric",
-      title: { en: "Safe to spend this week", fi: "Turvallisesti käytettävissä tällä viikolla" },
-      primary: { label: { en: "Until Sunday", fi: "Sunnuntaihin asti" }, value: r.safe_to_spend_week, epistemic: "estimate" },
-      rows: [
-        { label: { en: "Flexible money until payday", fi: "Joustovara palkkapäivään" }, value: r.flexible_until_payday, epistemic: "estimate" },
-        { label: { en: "Days left this week", fi: "Päiviä jäljellä tällä viikolla" }, value: String(r.days_left_in_week), epistemic: "fact" },
-      ],
-      epistemic: "estimate",
+      title: stated ? { en: "Left this week", fi: "Jäljellä tällä viikolla" } : { en: "Safe to spend this week", fi: "Turvallisesti käytettävissä tällä viikolla" },
+      primary: { label: { en: "Until Sunday", fi: "Sunnuntaihin asti" }, value: r.safe_to_spend_week, epistemic: kind },
+      rows: stated && r.stated_weekly_amount
+        ? [
+            { label: { en: "Your weekly amount", fi: "Viikkosummasi" }, value: r.stated_weekly_amount, epistemic: "fact",
+              note: { en: "As you told me. Say a new amount to change it.", fi: "Kuten kerroit. Sano uusi summa muuttaaksesi." } },
+            { label: { en: "Planned this week", fi: "Suunniteltu tällä viikolla" }, value: r.planned_this_week ?? { amount: "0.00", currency: "EUR" }, epistemic: "calculated" },
+            { label: { en: "Days left this week", fi: "Päiviä jäljellä tällä viikolla" }, value: String(r.days_left_in_week), epistemic: "fact" },
+          ]
+        : [
+            { label: { en: "Flexible money until payday", fi: "Joustovara palkkapäivään" }, value: r.flexible_until_payday, epistemic: "estimate" },
+            { label: { en: "Days left this week", fi: "Päiviä jäljellä tällä viikolla" }, value: String(r.days_left_in_week), epistemic: "fact" },
+          ],
+      epistemic: kind,
       ...(sts.data_mode ? { data_mode: sts.data_mode } : {}),
       basis: { calc_ids: [sts.calc_id as string], as_of: sts.as_of },
       assumptions: sts.assumptions.map((a) => ({ en: a })),
-      missing_data: [],
+      missing_data: stated ? [DeterministicFastPath.NO_BANK] : [],
       render_hints: {
-        glasses_display_lines: [`€${n} safe · until Sunday`, "estimate"],
+        glasses_display_lines: [stated ? `€${n} left · until Sunday` : `€${n} safe · until Sunday`, stated ? "your figure" : "estimate"],
         voice_summary: { en: `About ${n} euros through Sunday.`, fi: `Noin ${n} euroa sunnuntaihin asti.` },
       },
     };
-    return this.reply(req, "answered", text, "estimate", [card], [], [sts]);
+    return card;
   }
 
-  private affordability(req: DomainRequest, amount: string, source: "stated_amount" | "observation", observation?: Observation, label?: string): DomainResponse {
-    const { result, sts } = this.engine.calculateAffordability(req.user_ref, {
+  /**
+   * @param gotIt the weekly amount the user just gave (answering the coach's question, or "set")
+   */
+  private safeToSpend(req: DomainRequest, gotIt?: string, mode: "answer" | "set" = "answer"): DomainResponse {
+    const sts = this.engine.getSafeToSpend(req.user_ref);
+    if (!sts) return this.askForWeeklyAmount(req, { intent: "safe_to_spend" });
+    const r = sts.result as { safe_to_spend_week: Money; flexible_until_payday: Money; days_left_in_week: number;
+      stated_weekly_amount?: Money; planned_this_week?: Money };
+    const l = req.locale;
+    const n = roundEuros(r.safe_to_spend_week.amount).toString();
+    const stated = this.engine.source === "user_stated";
+    const nothingPlanned = !r.planned_this_week || toCents(r.planned_this_week.amount) === 0n;
+
+    let text: string;
+    if (gotIt !== undefined) {
+      const g = DeterministicFastPath.said(gotIt, l);
+      const head = mode === "set" ? pick(l, { en: `OK: ${g} euros until Sunday.`, fi: `Selvä: ${g} euroa sunnuntaihin asti.` })
+                                  : pick(l, { en: `Got it: ${g} euros until Sunday.`, fi: `Selvä: ${g} euroa sunnuntaihin asti.` });
+      text = nothingPlanned
+        ? `${head} ${pick(l, { en: "I'll keep track as you plan things.", fi: "Pidän kirjaa, kun suunnittelet ostoksia." })}`
+        : `${head} ${pick(l, { en: `You have about ${n} left.`, fi: `Jäljellä on noin ${n} euroa.` })}`;
+    } else if (stated) {
+      text = pick(l, { en: `You have about ${n} euros left of your weekly amount until Sunday.`, fi: `Viikkosummastasi on jäljellä noin ${n} euroa sunnuntaihin asti.` });
+    } else {
+      text = pick(l, {
+        en: `About ${n} euros is safe to spend through Sunday. That's an estimate from your balance and bills before payday.`,
+        fi: `Tällä viikolla voit käyttää noin ${n} euroa sunnuntaihin asti. Arvio perustuu saldoosi ja laskuihin ennen palkkapäivää.`,
+      });
+    }
+
+    const kind = stated ? "calculated" : "estimate";
+    const card = this.stsCard(sts);
+    return this.reply(req, "answered", text, kind, [card], [], [sts]);
+  }
+
+  private affordability(req: DomainRequest, amount: string, source: "stated_amount" | "observation", observation?: Observation,
+    label?: string, gotIt?: string): DomainResponse {
+    const calc = this.engine.calculateAffordability(req.user_ref, {
       amount, priceSource: source, ...(observation ? { observationId: observation.observation_id } : {}),
     });
+    if (!calc) {
+      return this.askForWeeklyAmount(req, { intent: "affordability", amount, source,
+        ...(observation ? { observation } : {}), ...(label ? { label } : {}) });
+    }
+    const { result, sts } = calc;
+    const stated = this.engine.source === "user_stated";
     const r = result.result as { verdict: "FITS" | "TIGHT" | "EXCEEDS" | "UNKNOWN"; safe_to_spend_week: Money; remaining_after: Money };
     const l = req.locale;
     const p = formatAmount(amount, l);
@@ -150,13 +302,27 @@ export class DeterministicFastPath implements AgentBackend {
     const over = pick(l, obs
       ? { en: `If that price is ${p}, it's`, fi: `Jos hinta on ${p} euroa, se on` }
       : { en: `${p} is`, fi: `${p} euroa on` });
-    const text = {
+    let text = {
       FITS: pick(l, { en: `${fits}, with about ${nAbs} euros left until Sunday. Want me to plan it in?`, fi: `${fits}, ja sunnuntaihin jää noin ${nAbs} euroa. Lisäänkö sen suunnitelmaan?` }),
       TIGHT: pick(l, { en: `${fits}, but it would leave about ${nAbs} euros until Sunday. Want me to plan it in?`, fi: `${fits}, mutta sunnuntaihin jäisi vain noin ${nAbs} euroa. Lisäänkö sen suunnitelmaan?` }),
       EXCEEDS: pick(l, { en: `${over} about ${nAbs} euros more than is safe to spend this week.`, fi: `${over} noin ${nAbs} euroa enemmän kuin tällä viikolla on turvallista käyttää.` }),
       UNKNOWN: pick(l, { en: "I can't see your balance, so I can't say if it fits. Details are on your phone.", fi: "En näe saldoasi, joten en voi sanoa, mahtuuko se. Tiedot ovat puhelimessa." }),
     }[r.verdict];
+    if (gotIt !== undefined) {
+      // Answering the coach's question: confirm the amount, then answer the original question, within the speech budget.
+      const g = DeterministicFastPath.said(gotIt, l);
+      const head = pick(l, { en: `Got it: ${g} euros until Sunday.`, fi: `Selvä: ${g} euroa sunnuntaihin asti.` });
+      const fitsTail = obs
+        ? pick(l, { en: `If the label's right, that leaves about ${nAbs}. Want me to plan it in?`, fi: `Jos hinta pitää, jäljelle jää noin ${nAbs} euroa. Lisäänkö sen suunnitelmaan?` })
+        : pick(l, { en: `That leaves about ${nAbs} after this. Want me to plan it in?`, fi: `Tämän jälkeen jää noin ${nAbs} euroa. Lisäänkö sen suunnitelmaan?` });
+      const overTail = obs
+        ? pick(l, { en: `If the label's right, this is about ${nAbs} more than that.`, fi: `Jos hinta pitää, tämä on noin ${nAbs} euroa enemmän.` })
+        : pick(l, { en: `This is about ${nAbs} more than that.`, fi: `Tämä on noin ${nAbs} euroa enemmän.` });
+      text = `${head} ${r.verdict === "EXCEEDS" ? overTail : fitsTail}`;
+    }
 
+    // A user-given weekly amount and a stated price are exact: "calculated". A camera-read price may be misread: "estimate".
+    const kind = stated && !obs ? "calculated" : "estimate";
     const verdictText: Record<typeof r.verdict, LText> = {
       FITS: { en: "Fits", fi: "Mahtuu" },
       TIGHT: { en: "Fits, but tight", fi: "Mahtuu, mutta tiukasti" },
@@ -169,17 +335,19 @@ export class DeterministicFastPath implements AgentBackend {
       capability_id: CAPABILITY_ID,
       type: "metric",
       title: { en: "Does it fit this week?", fi: "Mahtuuko tämä viikolle?" },
-      primary: { label: { en: "Left until Sunday after buying", fi: "Jäljellä sunnuntaihin oston jälkeen" }, value: r.remaining_after, epistemic: "estimate" },
+      primary: { label: { en: "Left until Sunday after buying", fi: "Jäljellä sunnuntaihin oston jälkeen" }, value: r.remaining_after, epistemic: kind },
       rows: [
         source === "observation"
           ? { label: { en: "Price on the label", fi: "Hintalapun hinta" }, value: { amount, currency: "EUR" }, epistemic: "observed",
               note: { en: "Read by the camera. Tap to correct.", fi: "Kameran lukema. Korjaa napauttamalla." } }
           : { label: { en: "Amount you asked about", fi: "Kysymäsi summa" }, value: { amount, currency: "EUR" }, epistemic: "fact",
               note: { en: "As you said", fi: "Kuten sanoit" } },
-        { label: { en: "Safe to spend until Sunday", fi: "Turvallisesti käytettävissä sunnuntaihin" }, value: r.safe_to_spend_week, epistemic: "estimate" },
+        stated
+          ? { label: { en: "Left of your weekly amount", fi: "Viikkosummastasi jäljellä" }, value: r.safe_to_spend_week, epistemic: "calculated" }
+          : { label: { en: "Safe to spend until Sunday", fi: "Turvallisesti käytettävissä sunnuntaihin" }, value: r.safe_to_spend_week, epistemic: "estimate" },
         { label: { en: "Verdict", fi: "Arvio" }, value: (isFi(l) ? verdictText[r.verdict].fi : verdictText[r.verdict].en)!, epistemic: "calculated" },
       ],
-      epistemic: "estimate",
+      epistemic: kind,
       ...(result.data_mode ? { data_mode: result.data_mode } : {}),
       basis: {
         calc_ids: [result.calc_id as string, sts.calc_id as string],
@@ -187,25 +355,30 @@ export class DeterministicFastPath implements AgentBackend {
         as_of: result.as_of,
       },
       assumptions: result.assumptions.map((a) => ({ en: a })),
-      missing_data: [],
-      render_hints: { glasses_display_lines: [verdictText[r.verdict].en!.slice(0, 40), `€${nAbs} left until Sunday`.slice(0, 40), "estimate"] },
+      missing_data: stated ? [DeterministicFastPath.NO_BANK] : [],
+      render_hints: { glasses_display_lines: [verdictText[r.verdict].en!.slice(0, 40), `€${nAbs} left until Sunday`.slice(0, 40), stated && !obs ? "your figure" : "estimate"] },
     };
 
     const proposals: ActionProposal[] = [];
     if (r.verdict === "FITS" || r.verdict === "TIGHT") {
-      const proposal = this.planProposal(req.user_ref, amount, safeLabel(label), r.safe_to_spend_week.amount, r.remaining_after.amount, source);
+      const proposal = this.planProposal(req.user_ref, amount, safeLabel(label), r.safe_to_spend_week.amount, r.remaining_after.amount, source, stated);
       proposals.push(proposal);
       card.proposal_ids = [proposal.proposal_id];
     }
-    return this.reply(req, "answered", text, "estimate", [card], proposals, [result, sts]);
+    return this.reply(req, "answered", text, kind, [card], proposals, [result, sts]);
   }
 
-  private planProposal(userRef: string, amount: string, label: string, before: string, after: string, source: string): ActionProposal {
+  /**
+   * Money in the proposal is left as plain decimal strings in `details` so the phone formats it
+   * exactly like the cards (the backend can't match every client's locale formatting).
+   */
+  private planProposal(userRef: string, amount: string, label: string, before: string, after: string, source: string,
+    stated: boolean): ActionProposal {
     const proposalId = `pc_${randomUUID().slice(0, 8)}`;
     const payload = { kind: "finance.plan.add", label: label || "Item", amount };
     const hash = payloadHash(payload);
     this.payloads.set(proposalId, { userRef, hash, payload });
-    const read = source === "observation" ? ", read from label" : "";
+    const obs = source === "observation";
     return {
       schema: "platform.action_proposal/v1",
       proposal_id: proposalId,
@@ -215,11 +388,14 @@ export class DeterministicFastPath implements AgentBackend {
       summary: {
         spoken: { en: "Plan this into this week? Tap to confirm.", fi: "Lisätäänkö tämä viikon suunnitelmaan? Vahvista napauttamalla." },
         text: {
-          en: `Add ${label ? `'${label}' ` : ""}(€${amount}${read}) to this week's planned spending`,
-          fi: `Lisää ${label ? `'${label}' ` : ""}(${formatAmount(amount, "fi")} €) viikon suunniteltuihin menoihin`,
+          en: `Add ${label ? `“${label}”` : "this"} to this week's planned spending?`,
+          fi: `Lisätäänkö ${label ? `“${label}”` : "tämä"} tämän viikon suunniteltuihin menoihin?`,
         },
       },
-      details: [{ label: { en: "Safe to spend after", fi: "Käytettävissä oston jälkeen" }, before, after }],
+      details: [
+        { label: obs ? { en: "Price (read from the label)", fi: "Hinta (luettu hintalapusta)" } : { en: "Amount", fi: "Summa" }, after: amount },
+        { label: stated ? { en: "Left this week", fi: "Jäljellä tällä viikolla" } : { en: "Safe to spend this week", fi: "Käytettävissä tällä viikolla" }, before, after },
+      ],
       payload_hash: hash,
       risk: "low",
       reversible: true,
@@ -245,8 +421,11 @@ export class DeterministicFastPath implements AgentBackend {
 
     this.engine.addPlanned(c.user_ref, { label: held.payload.label, amount: held.payload.amount });
     const appliedAt = new Date();
+    // The updated week, so the phone can replace the now-stale answer card.
+    const sts = this.engine.getSafeToSpend(c.user_ref);
     return {
       ...base,
+      ...(sts ? { card: this.stsCard(sts) } : {}),
       status: "applied",
       applied_at: appliedAt.toISOString(),
       undo_token: `undo_${c.proposal_id}`,

@@ -285,7 +285,16 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
             : { decision: intent.platform_intent, channel: "voice_readback",
                 evidence: { utterance: intent.transcript!.text, asr_confidence: intent.transcript!.confidence ?? 0 } };
         const result = await confirmProposal(entry, session, req, deps);
-        if (result.status === "applied") return say("Done. You can undo it on your phone.", "Tehty. Voit perua sen puhelimessa.");
+        if (result.status === "applied") {
+          const final = platformFinal(`req_${intent.turn_id}`, fi ? "Tehty. Voit perua sen puhelimessa." : "Done. You can undo it on your phone.");
+          if (result.card && final.type === "final") {
+            // Carry the capability's updated card (cited calc_ids included in the trace).
+            emit({ type: "card", card: result.card });
+            final.response.cards = [result.card];
+            final.response.trace.calc_ids = result.card.basis.calc_ids;
+          }
+          return emit(final);
+        }
         if (result.status === "rejected_by_user") return say("OK, I won't.", "Selvä, en tee sitä.");
         throw new PlatformError("INTERNAL", { detail: `apply returned ${result.status}` });
       }

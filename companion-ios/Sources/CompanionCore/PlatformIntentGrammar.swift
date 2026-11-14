@@ -28,11 +28,29 @@ public enum PlatformIntentGrammar {
     }
 
     /// Words in a *partial* transcript that mean "look at this": start the camera stream early
-    /// so it overlaps with ASR finalisation (ARCHITECTURE.md §4.3).
-    private static let captureWords: Set<String> = ["this", "these", "scan", "tämä", "tämän", "nämä", "skannaa", "den", "det", "skanna"]
+    /// so it overlaps with ASR finalisation (ARCHITECTURE.md §4.3). The user starts every capture,
+    /// so this must only fire when they point at an object: "does this fit", "scan this",
+    /// "mahtuuko tämä", "får den här plats", never "this week" / "tällä viikolla".
+    private static let scanWords: Set<String> = ["scan", "skannaa", "skanna"]
+    private static let objectWords: Set<String> = ["this", "these", "tämä", "tämän", "nämä"]
+    private static let timeWords: Set<String> = [
+        "week", "weekend", "month", "year", "morning", "evening", "afternoon", "time", "weeks",
+        "viikko", "viikolla", "viikon", "viikkona", "kuu", "kuussa", "kuun", "vuonna", "vuoden", "aamuna", "iltana",
+        "veckan", "veckor", "månaden", "året", "gången",
+    ]
 
     public static func wantsCapture(_ partial: String) -> Bool {
         let words = normalise(partial).split(whereSeparator: { !$0.isLetter }).map(String.init)
-        return words.contains(where: captureWords.contains)
+        if words.contains(where: scanWords.contains) { return true }
+        for (i, w) in words.enumerated() {
+            let next = i + 1 < words.count ? words[i + 1] : nil
+            if objectWords.contains(w), next.map({ !timeWords.contains($0) }) ?? true { return true }
+            // Swedish "den här" / "det här" (this one), but not "den här veckan" (this week)
+            if (w == "den" || w == "det"), next == "här" {
+                let after = i + 2 < words.count ? words[i + 2] : nil
+                if after.map({ !timeWords.contains($0) }) ?? true { return true }
+            }
+        }
+        return false
     }
 }
