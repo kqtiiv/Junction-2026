@@ -1,29 +1,29 @@
 # Spendtacles
 
-**A finance coach in your Ray-Ban Meta glasses.** Look at a price, ask *"Does this fit my week?"* (or *"Mahtuuko tämä viikon budjettiin?"*), and hear an answer built on numbers you can check. Nothing changes without your OK.
+**A finance coach in your Ray-Ban Meta glasses.** Look at a price, ask *"Can I afford this?"* (or *"Onko minulla varaa tähän?"*), and hear an answer built on numbers you can check. Nothing changes without your OK.
 
-Spendtacles is a glasses platform with one stable capability interface. **S-Bank Coach** is the first capability that plugs into it. Built for Junction 2026, challenge *AI Glasses for Everyone, Everyday*.
+Spendtacles is a glasses platform with one stable capability interface, and the money coach is the first capability that plugs into it. Built for Junction 2026, challenge *AI Glasses for Everyone, Everyday*.
 
 ## The demo flow
 
-These screenshots come from CI, not a mock-up. The UI test runs the real iOS app in the iOS Simulator, with Meta's **Mock Device Kit** standing in for the glasses, against the real backend. ([`CompanionUITests.swift`](companion-ios/UITests/CompanionUITests.swift), [`ios.yml`](.github/workflows/ios.yml))
+These screenshots come from CI, not a mock-up. The UI test runs the real iOS app in the iOS Simulator, with Meta's **Mock Device Kit** standing in for the glasses, against the real backend in fixture mode. ([`CompanionUITests.swift`](companion-ios/UITests/CompanionUITests.swift), [`ios.yml`](.github/workflows/ios.yml))
 
 <table>
   <tr>
     <td align="center" width="25%"><img src="companion-ios/App/Resources/demo_price_label.jpg" alt="Demo price label: LANGATTOMAT KUULOKKEET, 79,90 €" width="240"></td>
     <td align="center" width="25%"><img src="docs/images/1-consent.png" alt="Consent screen: Before we start" width="240"></td>
-    <td align="center" width="25%"><img src="docs/images/2-answer-and-proposal.png" alt="Answer card with a proposal to add the purchase to this week's plan" width="240"></td>
-    <td align="center" width="25%"><img src="docs/images/3-confirmed.png" alt="Confirmed: 10,26 € left until Sunday" width="240"></td>
+    <td align="center" width="25%"><img src="docs/images/2-answer-and-proposal.png" alt="Spoken answer and a proposal to add the purchase to this week's planned spending" width="240"></td>
+    <td align="center" width="25%"><img src="docs/images/3-confirmed.png" alt="Confirmed: 10,26 € safe to spend this week" width="240"></td>
   </tr>
   <tr>
     <td valign="top"><b>0. What the glasses see.</b> The simulated camera is fed this price label.</td>
     <td valign="top"><b>1. Consent first.</b> No finance turn runs without a grant. Photos are deleted as soon as the price is read.</td>
-    <td valign="top"><b>2. Answer + proposal.</b> <i>"If that price is 79.90, it fits, but it would leave about 10 euros until Sunday."</i> The coach proposes planning it in, and waits.</td>
-    <td valign="top"><b>3. Confirmed.</b> One explicit tap. Every value is labelled <i>read by camera</i>, <i>estimate</i> or <i>calculated</i>.</td>
+    <td valign="top"><b>2. Answer + proposal.</b> <i>"If that price is 79.90, it fits, but it would leave about 10 euros until Sunday. Want me to plan it in?"</i> The proposal shows the before and after, and waits.</td>
+    <td valign="top"><b>3. Confirmed.</b> One explicit tap, and the card updates to the new figure. Every value is labelled <i>fact</i>, <i>estimate</i>, <i>calculated</i> or <i>read by camera</i>.</td>
   </tr>
 </table>
 
-The dark strip at the top (`glasses: mock · mode: glasses · seq …`) is the debug overlay. It is there on purpose: **mocks are never silent** (DEC-005), so the app always shows when simulated glasses or fixture data are in play.
+The dark strip under the title (`glasses: mock · mode: glasses · seq …`) is the debug overlay. It is there on purpose: **mocks are never silent** (DEC-005), so the app always shows when simulated glasses or fixture data are in play.
 
 ## Built to be trusted
 
@@ -33,33 +33,54 @@ The dark strip at the top (`glasses: mock · mode: glasses · seq …`) is the d
 - **Consent is fail-closed.** Revoking consent deletes the captures made under it.
 - **Money is never a float.** Amounts are decimal strings end to end.
 
-## No bank connected? Just say a number
+## Where the numbers come from
 
-With `FINANCE_SOURCE=user_stated` the coach works without any bank data, and without a setup screen. The first time a question needs money figures, it asks one thing out loud and then answers the original question:
+`FINANCE_SOURCE` picks the source. Whatever it is, the coach's wording and the trust rules above stay the same.
 
-> "Does this fit my week?" → "How much do you want to spend until Sunday?" → "About a hundred." → "Got it: 100 euros until Sunday. If the label's right, that leaves about 20. Want me to plan it in?"
+### No bank connected? Just say a number (`user_stated`)
+
+The coach works without any bank data, and without a setup screen. The first time a question needs money figures, it asks one thing out loud and then answers the original question:
+
+> "Can I afford this?" → "How much do you want to spend until Sunday?" → "About a hundred." → "Got it: 100 euros until Sunday. If the label's right, that leaves about 20. Want me to plan it in?"
 
 - It understands digits and round number words in English and Finnish ("about a hundred", "noin sata"). An unclear answer gets one retry, then the coach drops the question politely. It never guesses.
 - The amount carries over to later weeks. Saying "my budget this week is 60" changes it, and confirmed plans count down from it.
 - Cards label it *"Your weekly amount, as you told me"* and say no bank is connected. These are the user's own figures, so they are not reported as a mock.
 
+### The team's money engine on transaction data (`s_pankki`)
+
+The answers come from our teammate's deterministic money engine, run on the Junction 2026 synthetic transaction dataset ([`finance-engine/`](finance-engine/README.md), DEC-024). It answers per day until payday, the way the engine computes it (DEC-025, proposed):
+
+> "What's safe to spend?" → "You can safely spend about 32 euros a day for the next 10 days, until payday."
+>
+> "Can I afford this?" (79,90 € label) → "If that price is 79.90, it fits. You'd still have about 24 euros a day until payday. Want me to plan it in?"
+
+- The engine's floats become decimal strings at the boundary, and every figure gets a `calc_id` that the verifier resolves back through the engine service.
+- The dataset is synthetic history, so "today" is a fixed simulated date (2026-09-05). Every result says so.
+- The demo customer is CUST04069. A customer whose bills exceed their balance is told plainly that nothing is safe to spend.
+
+### Fixture (`fixture`, the default)
+
+Fixed demo numbers (€90.16 safe to spend this week), reported as `mock` everywhere. This is what CI and the screenshots above use.
+
 ## What's real and what's mocked
 
 | | |
 |---|---|
-| **Real** | Orchestrator, consent, capture pipeline, confirmation signing, number verification, contracts, iOS companion core, the DAT SDK integration (built and driven in CI with Mock Device Kit) |
-| **Mocked** (labelled `mock` in `/health` and on screen) | Finance engine in the default `FINANCE_SOURCE=fixture` mode (S-Bank demo numbers: €90.16 safe to spend this week), label reader (always returns the demo €79.90 label), the Coach team's agent (client designed and tested against a fake agent, not yet connected) |
+| **Real** | Orchestrator, consent, capture pipeline, confirmation signing, number verification, contracts, iOS companion core, the DAT SDK integration (built and driven in CI with Mock Device Kit), and the team's money engine on transaction data (`s_pankki`, on a simulated date) |
+| **Mocked** (labelled `mock` in `/health` and on screen) | The `fixture` finance source, the label reader (always returns the demo €79.90 label), and the coach agent (client designed and tested against a fake agent, not yet connected) |
 | **Behind flags** | "Hey Meta" voice launch and glasses-tap confirmation are experimental in DAT 1.0.1, so each has a fallback (DEC-004, DEC-022) |
 
 ## Repository layout
 
 | Path | What it is |
 |---|---|
-| [`backend/`](backend/README.md) | Platform orchestrator + S-Bank Coach adapter. TypeScript, Node 22, Fastify. 48 tests. |
+| [`backend/`](backend/README.md) | Platform orchestrator + money-coach adapter. TypeScript, Node 22, Fastify. 63 tests. |
 | [`companion-ios/`](companion-ios/README.md) | iOS companion: glasses session, Bluetooth audio, speech, capture, cards. Swift, SwiftUI, Meta Wearables DAT 1.0.1. |
+| [`finance-engine/`](finance-engine/README.md) | HTTP service in front of the team's Python money engine: decimal strings, `calc_id`s, calculation lookups. Python, FastAPI. 10 tests. |
 | [`contracts/`](contracts/README.md) | Versioned JSON Schema contracts, valid/invalid examples as tests, generated TS/Swift/Kotlin/Python types, OpenAPI specs, the adapter interface |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Platform architecture |
-| [`docs/ARCHITECTURE_DECISION_LOG.md`](docs/ARCHITECTURE_DECISION_LOG.md) | 23 decisions (DEC-001 to DEC-023), each with alternatives, evidence and revisit triggers |
+| [`docs/ARCHITECTURE_DECISION_LOG.md`](docs/ARCHITECTURE_DECISION_LOG.md) | 25 decisions (DEC-001 to DEC-025), each with alternatives, evidence and revisit triggers |
 | [`docs/SOURCES.md`](docs/SOURCES.md), [`docs/adr/evidence/`](docs/adr/README.md) | Source register and research write-ups |
 | [`docs/finance/REFERENCE_DESIGN.md`](docs/finance/REFERENCE_DESIGN.md) | Finance-domain reference design |
 
@@ -71,7 +92,8 @@ cd contracts && npm install && npm run check
 
 # Backend (fixture data, demo token)
 cd backend && npm install && npm test && npm run dev    # http://localhost:8787
-FINANCE_SOURCE=user_stated npm run dev                  # no-bank-data mode instead of fixture numbers
+FINANCE_SOURCE=user_stated npm run dev                  # no bank data: the coach asks for a weekly amount
+FINANCE_SOURCE=s_pankki npm run dev                     # the team's engine (start finance-engine/ first, see its README)
 curl -H 'authorization: Bearer demo-token' localhost:8787/health
 
 # iOS companion core (macOS or Linux): unit tests, then the end-to-end smoke test against the running backend
@@ -83,4 +105,4 @@ The app itself needs Xcode. No Mac? The [`iOS companion`](.github/workflows/ios.
 
 ## What's next
 
-Real S-Bank data through its PSD2 sandbox, a real label reader, receipt matching, connecting the Coach team's agent, then more capabilities on the same platform.
+Real bank data through a PSD2 sandbox, a real label reader, receipt matching, connecting the coach agent, then more capabilities on the same platform.
