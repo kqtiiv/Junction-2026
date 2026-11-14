@@ -1,5 +1,9 @@
 # XcodeGen spec for the iOS app, so no one has to create the Xcode project by hand
 # (and CI can build it on a macOS runner).  Generate:  cd companion-ios/Xcode && xcodegen generate
+#
+# Two app targets share one template:
+#   Companion     the real app (real glasses). Does not link Meta's Mock Device Kit.
+#   CompanionSim  same code + Mock Device Kit (META_MOCK_DEVICE), for the iOS Simulator and UI tests.
 name: Companion
 options:
   bundleIdPrefix: dev.junction26
@@ -20,8 +24,8 @@ settings:
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "1"
 
-targets:
-  Companion:
+targetTemplates:
+  CompanionApp:
     type: application
     platform: iOS
     sources:
@@ -37,18 +41,15 @@ targets:
         product: MWDATCamera
       - package: MetaWearablesDAT
         product: MWDATInputs
-      - package: MetaWearablesDAT
-        product: MWDATMockDevice     # only used under #if DEBUG
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: dev.junction26.companion
         # Simulator builds are ad-hoc signed; set DEVELOPMENT_TEAM for a real iPhone.
         CODE_SIGN_STYLE: Automatic
         "CODE_SIGN_IDENTITY[sdk=iphonesimulator*]": "-"
         META_APP_ID: ""          # Developer Center app ID; may stay empty in Developer Mode
         CLIENT_TOKEN: ""
     info:
-      path: Info.plist
+      path: ${target_name}-Info.plist
       properties:
         CFBundleDisplayName: S-Bank Coach
         UILaunchScreen: {}
@@ -77,9 +78,25 @@ targets:
         CompanionDevToken: demo-token
         CompanionUserRef: u_7f3a
         CompanionLocale: en-FI
-        CompanionUseMetaMockDevice: true     # simulated glasses in debug builds; set false on a real iPhone
         CompanionFlagVoiceInvocation: false  # hour-0 device gate (DEC-022)
         CompanionFlagInputs: false
+
+targets:
+  Companion:
+    templates: [CompanionApp]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.junction26.companion
+
+  CompanionSim:
+    templates: [CompanionApp]
+    dependencies:
+      - package: MetaWearablesDAT
+        product: MWDATMockDevice
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.junction26.companion.sim
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: $(inherited) META_MOCK_DEVICE
 
   CompanionUITests:
     type: bundle.ui-testing
@@ -87,18 +104,22 @@ targets:
     sources:
       - path: ../UITests
     dependencies:
-      - target: Companion
+      - target: CompanionSim
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.junction26.companion.uitests
         "CODE_SIGN_IDENTITY[sdk=iphonesimulator*]": "-"
-        TEST_TARGET_NAME: Companion
+        TEST_TARGET_NAME: CompanionSim
 
 schemes:
   Companion:
     build:
       targets:
         Companion: all
+  CompanionSim:
+    build:
+      targets:
+        CompanionSim: all
         CompanionUITests: [test]
     test:
       targets: [CompanionUITests]

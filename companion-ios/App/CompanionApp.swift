@@ -1,5 +1,6 @@
 // App entry point. Add this folder's files to the Xcode app target (see README).
 // Configuration comes from Info.plist: CompanionBackendURL, CompanionDevToken, CompanionUserRef, CompanionLocale.
+// Two Xcode targets share this code: Companion (real glasses) and CompanionSim (Meta Mock Device Kit).
 import SwiftUI
 import Contracts
 import CompanionCore
@@ -24,12 +25,13 @@ struct CompanionApp: App {
             inputs: info["CompanionFlagInputs"] as? Bool ?? false
         )
         #if canImport(MWDATCore)
-        // Simulated glasses (Meta Mock Device Kit) for the iOS Simulator: Info.plist CompanionUseMetaMockDevice = YES.
+        // Configure the SDK first; Meta's sample enables the Mock Device Kit only afterwards.
+        DATGlassesBridge.configureSDK()
+        // Simulated glasses only in the CompanionSim target (META_MOCK_DEVICE) running in the
+        // iOS Simulator, never on a real iPhone, where the real glasses must be exercised.
         var simulated = false
-        #if DEBUG && canImport(MWDATMockDevice)
-        if info["CompanionUseMetaMockDevice"] as? Bool ?? false {
-            do { try MetaMockDevice.start(); simulated = true } catch { print("⚠️ Mock Device Kit failed: \(error)") }
-        }
+        #if META_MOCK_DEVICE && canImport(MWDATMockDevice) && targetEnvironment(simulator)
+        do { try MetaMockDevice.start(); simulated = true } catch { print("⚠️ Mock Device Kit failed: \(error)") }
         #endif
         let bridge: GlassesBridge = DATGlassesBridge(flags: flags, simulated: simulated)
         #else

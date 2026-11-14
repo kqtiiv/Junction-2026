@@ -96,6 +96,17 @@ public final class CompanionCoordinator {
         consent = try await client.grantConsent(capabilityID: config.capabilityID, dataClasses: dataClasses, purposes: purposes)
     }
 
+    /// Waits until the glasses bridge has reported its registration state (after `start()`),
+    /// so callers don't mistake the initial placeholder for "not registered".
+    public func reportedRegistration(timeout: TimeInterval = 5) async -> Registration? {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if let r = tracker?.reportedRegistration() { return r }
+            try? await Task.sleep(nanoseconds: 50_000_000)
+        }
+        return tracker?.reportedRegistration()
+    }
+
     public func setAudioRoute(_ route: AudioRoute) async {
         tracker?.mutate { $0.audioRoute = route }
         await publishDeviceState()

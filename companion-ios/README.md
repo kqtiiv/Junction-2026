@@ -24,7 +24,7 @@ companion-ios/
 |---|---|
 | `Contracts`, `CompanionCore`, `CompanionSmoke`, tests | **Compiled and tested** with Swift 6.2.1 on Linux: 14 unit tests pass, and `companion-smoke` runs the whole demo flow against the real backend (session → consent → device state → voice turn → glasses capture → glasses-tap confirmation → updated allowance → phone-only fallback) with zero backend validation warnings |
 | `CompanionUI` (SwiftUI, AVFoundation, Speech) | Syntax-checked only. **Type-check in Xcode.** |
-| `App/DATGlassesBridge.swift` | Written from `docs/adr/evidence/meta-dat.md` without the SDK. **Expect signature fixes**; every SDK call is marked `// VERIFY` |
+| `App/DATGlassesBridge.swift` | Written against the SDK 1.0.1 `.swiftinterface` files (the public API), not yet compiled: CI is its first build |
 
 ## One-time Xcode setup (Mac)
 
@@ -47,17 +47,18 @@ companion-ios/
 
 6. Enable Developer Mode for the glasses in the Meta AI app, run on a real iPhone, and do the hour-0 device gate.
 
-## Run without glasses: iOS Simulator + Meta Mock Device Kit
+## Run without glasses (and without a Mac): CI on GitHub's macOS runners
 
-Meta's Mock Device Kit simulates the glasses inside the DAT SDK, so the real `DATGlassesBridge` code runs with no hardware. The SDK's own guide runs its sample this way on the iOS Simulator.
+`.github/workflows/ios.yml` builds everything on a macOS runner and runs the app in the iOS Simulator with Meta's **Mock Device Kit** (simulated Ray-Ban Meta glasses inside the real DAT SDK). The UI test walks through consent → connect glasses → "does this fit my week?" → answer card → confirm, and uploads screenshots of each step as the `ios-screenshots` artifact.
 
-1. Do the one-time setup above, and link the SDK's **`MWDATMockDevice`** product to the app (debug only).
-2. Add `App/MetaMockDevice.swift` to the app target. Optionally add a price-label photo named `demo_price_label.jpg`; it becomes what the glasses "capture" (the fixture label reader reads €79.90 whatever the image shows).
-3. In Info.plist set `CompanionUseMetaMockDevice` = YES and `CompanionBackendURL` = `http://localhost:8787` (the Simulator reaches your Mac's localhost; keep `NSAllowsLocalNetworking`).
-4. On the Mac: `cd backend && npm run dev`. Run the app in an iOS Simulator (iOS 26.x; a wrapper project reports issues with the 18.0/18.5 simulators).
-5. Expect the overlay to show `glasses: mock · mode: glasses`. Simulated glasses use the phone's audio, so no Bluetooth route is required for them (real glasses still require one). Type or hold the mic and ask *"does this fit my week?"* to exercise the capture path.
+The Xcode project is generated from `Xcode/project.yml` with XcodeGen and has two app targets:
 
-`MetaMockDevice` also has `tap()`, `takeOff()` and `closeHinges()` for testing gesture confirmation and the phone-only fallback.
+| Target | What it is |
+|---|---|
+| `Companion` | The real app for a real iPhone and real glasses. Does **not** link the Mock Device Kit. |
+| `CompanionSim` | Same code plus Meta's Mock Device Kit (`META_MOCK_DEVICE`). Simulated glasses switch on only in the iOS Simulator; the overlay shows `glasses: mock`. Used by the UI test. |
+
+With a Mac: `brew install xcodegen && cd Xcode && xcodegen generate`, open `Companion.xcodeproj`, start the backend (`cd backend && npm run dev`), and run `CompanionSim` in a simulator (iOS 26.x; a third-party wrapper reports issues with the 18.0/18.5 simulators).
 
 ## Commands
 

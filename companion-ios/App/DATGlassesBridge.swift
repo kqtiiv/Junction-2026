@@ -17,14 +17,20 @@ public final class DATGlassesBridge: GlassesBridge {
     public let flags: ExperimentalFlags
     public let events: AsyncStream<GlassesEvent>
     private let continuation: AsyncStream<GlassesEvent>.Continuation
-
     private let selector: AutoDeviceSelector
+
+    // Session state is touched from SDK callbacks, observer tasks and callers: always under `lock`.
+    private let lock = NSLock()
     private var session: MWDATCore.DeviceSession?
     private var camera: Camera?                 // added once per session; the stream starts/stops per capture
-    private var voice: VoiceInvocationsStream?
-    private let tokens = ListenerTokenBag()     // listener tokens, cleared at one teardown point
-    private var observers: [Task<Void, Never>] = []
+    private var generation = 0                  // bumps per session, so a late teardown can't wipe a newer one
     private var sessionObservers: [Task<Void, Never>] = []
+    private var deviceStateToken: (any AnyListenerToken)?
+    private var observedDevice: DeviceIdentifier?
+
+    private var voice: VoiceInvocationsStream?
+    private let tokens = ListenerTokenBag()     // app-lifetime listener tokens
+    private var observers: [Task<Void, Never>] = []
 
     public init(flags: ExperimentalFlags, simulated: Bool = false) {
         self.flags = flags
@@ -35,10 +41,25 @@ public final class DATGlassesBridge: GlassesBridge {
 
     deinit { teardown() }
 
+    // MARK: SDK configuration (once per process, before Meta's Mock Device Kit is enabled)
+
+    private static let configureLock = NSLock()
+    private static var configured: Bool?
+
+    /// Configures the SDK exactly once. Call early (Meta's sample does it in App.init);
+    /// the Mock Device Kit must only be enabled after this succeeds.
+    @discardableResult
+    public static func configureSDK() -> Bool {
+        configureLock.lock(); defer { configureLock.unlock() }
+        if let done = configured { return done }
+        do { try Wearables.configure(); configured = true } catch { configured = false }
+        return configured!
+    }
+
     // MARK: Configure + registration
 
     public func configure() async {
-        do { try Wearables.configure() } catch {
+        guard Self.configureSDK() else {
             continuation.yield(.registration(.unavailable))
             continuation.yield(.degraded(.metaAIAppMissing))
             return
@@ -55,31 +76,48 @@ public final class DATGlassesBridge: GlassesBridge {
                 }
             }
         })
-        let tokens = self.tokens
-        observers.append(Task { [selector] in
+        observers.append(Task { [weak self, selector] in
             for await id in selector.activeDeviceStream() {
-                guard let id, let device = Wearables.shared.deviceForIdentifier(id) else {
-                    c.yield(.availability(.none))
-                    continue
-                }
-                switch device.compatibility() {
-                case .deviceUpdateRequired:
-                    c.yield(.availability(.updateRequired)); c.yield(.degraded(.deviceUpdateRequired))
-                case .sdkUpdateRequired:
-                    c.yield(.availability(.updateRequired)); c.yield(.degraded(.sdkUpdateRequired))
-                default:
-                    c.yield(.availability(.available))
-                }
-                // Hinges closed forces the session to `stopped` (terminal); thermal limits pause it.
-                device.addDeviceStateListener { state in
-                    if state.hingeState == .closed { c.yield(.degraded(.hingesClosed)) }
-                    switch state.thermalLevel {
-                    case .severe, .critical, .emergency, .shutdown: c.yield(.degraded(.thermal))
-                    default: break
-                    }
-                }.store(in: tokens)
+                self?.observeDevice(id)
             }
         })
+    }
+
+    /// One device-state listener per active device: replaced when the device changes,
+    /// skipped when the selector re-emits the same device.
+    private func observeDevice(_ id: DeviceIdentifier?) {
+        let c = continuation
+        guard let id, let device = Wearables.shared.deviceForIdentifier(id) else {
+            let old = swapDeviceToken(nil, device: nil)
+            Task { await old?.cancel() }
+            c.yield(.availability(.none))
+            return
+        }
+        switch device.compatibility() {
+        case .deviceUpdateRequired: c.yield(.availability(.updateRequired)); c.yield(.degraded(.deviceUpdateRequired))
+        case .sdkUpdateRequired: c.yield(.availability(.updateRequired)); c.yield(.degraded(.sdkUpdateRequired))
+        default: c.yield(.availability(.available))
+        }
+        lock.lock(); let same = observedDevice == id && deviceStateToken != nil; lock.unlock()
+        if same { return }
+        // Hinges closed forces the session to `stopped` (terminal); thermal limits pause it.
+        let token = device.addDeviceStateListener { state in
+            if state.hingeState == .closed { c.yield(.degraded(.hingesClosed)) }
+            switch state.thermalLevel {
+            case .severe, .critical, .emergency, .shutdown: c.yield(.degraded(.thermal))
+            default: break
+            }
+        }
+        let old = swapDeviceToken(token, device: id)
+        Task { await old?.cancel() }
+    }
+
+    private func swapDeviceToken(_ token: (any AnyListenerToken)?, device: DeviceIdentifier?) -> (any AnyListenerToken)? {
+        lock.lock(); defer { lock.unlock() }
+        let old = deviceStateToken
+        deviceStateToken = token
+        observedDevice = device
+        return old
     }
 
     public func startRegistration() async throws {
@@ -95,13 +133,19 @@ public final class DATGlassesBridge: GlassesBridge {
     // MARK: Device session (subscribe before start; `stopped` is terminal)
 
     public func startSession() async throws {
-        teardownSession()
+        teardownSession(ifGeneration: nil)
         let s: MWDATCore.DeviceSession
         do { s = try Wearables.shared.createSession(deviceSelector: selector) }
         catch { throw GlassesError.unavailable("session: \(error)") }
+
+        lock.lock()
+        generation += 1
+        let gen = generation
         session = s
+        lock.unlock()
+
         let c = continuation
-        sessionObservers.append(Task { [weak self] in
+        let stateObserver = Task { [weak self] in
             for await state in s.stateStream() {
                 switch state {
                 case .idle: c.yield(.session(.idle))
@@ -111,11 +155,11 @@ public final class DATGlassesBridge: GlassesBridge {
                 case .stopping: c.yield(.session(.stopping))
                 case .stopped:
                     c.yield(.session(.stopped))
-                    self?.teardownSession()   // a new session is needed after stop
+                    self?.teardownSession(ifGeneration: gen)   // a new session is needed after stop
                 }
             }
-        })
-        sessionObservers.append(Task {
+        }
+        let errorObserver = Task {
             for await error in s.errorStream() {
                 switch error {
                 case .thermalCritical, .thermalEmergency: c.yield(.degraded(.thermal))
@@ -124,23 +168,29 @@ public final class DATGlassesBridge: GlassesBridge {
                 default: break
                 }
             }
-        })
-        if flags.voiceInvocation { await startVoiceInvocation(deviceID: s.deviceId) }   // register before start
+        }
+        lock.lock(); sessionObservers += [stateObserver, errorObserver]; lock.unlock()
 
+        if flags.voiceInvocation { await startVoiceInvocation(deviceID: s.deviceId) }   // register before start
         do { try s.start() } catch { throw GlassesError.unavailable("session start: \(error)") }
         if flags.inputs { startInputs(on: s) }
         continuation.yield(.camera(permission: await cameraPermission(), stream: .stopped))
     }
 
     public func stopSession() async {
-        session?.stop()
-        teardownSession()
+        lock.lock(); let s = session; let gen = generation; lock.unlock()
+        s?.stop()
+        // Report `stopped` ourselves: the state observer is cancelled by teardown and may miss it.
+        continuation.yield(.session(.stopped))
+        teardownSession(ifGeneration: gen)
     }
 
     // MARK: Capture: short stream → capturePhoto(.jpeg) → stop (DEC-006)
 
     public func captureStill() async throws -> Data {
+        lock.lock(); let session = self.session; let existing = camera; lock.unlock()
         guard let session else { throw GlassesError.unavailable("no session") }
+
         var permission = await cameraPermission()
         if permission == .denied || permission == .unknown {
             // Granted in the Meta AI app, not an OS dialog; the UI should tell the user first.
@@ -152,11 +202,11 @@ public final class DATGlassesBridge: GlassesBridge {
         }
 
         let cam: Camera
-        if let existing = camera { cam = existing } else {
+        if let existing { cam = existing } else {
             // Medium resolution is the assumed minimum for price labels (DEC-006 [assumption]).
             let config = StreamConfiguration(videoCodec: .raw, resolution: .medium, frameRate: 7)
             guard let added = try? session.addCamera(config: config) else { throw GlassesError.captureFailed("addCamera failed") }
-            camera = added
+            lock.lock(); camera = added; lock.unlock()
             cam = added
         }
         let stream = cam.stream
@@ -165,19 +215,30 @@ public final class DATGlassesBridge: GlassesBridge {
             stream.stop()
             continuation.yield(.camera(permission: permission, stream: .stopped))
         }
-        stream.start()
-        _ = try await first(stream.statePublisher, timeout: 8) { state in
+
+        // Subscribe BEFORE starting. Fail fast if the stream stops or pauses after it began
+        // (e.g. a touchpad tap pauses it) instead of waiting for the timeout.
+        let began = Flag()
+        let streaming = Waiter(stream.statePublisher) { (state: StreamState) -> Waiter<StreamState>.Decision in
             switch state {
-            case .streaming: return true
-            default: return false
+            case .streaming: return .accept(state)
+            case .starting, .waitingForDevice: began.set(); return .wait
+            case .stopped, .stopping, .paused: return began.isSet ? .fail(GlassesError.captureFailed("stream \(state)")) : .wait
             }
         }
+        stream.start()
+        _ = try await streaming.value(timeout: 8)
         continuation.yield(.camera(permission: permission, stream: .streaming))
 
-        async let photo = first(stream.photoDataPublisher, timeout: 6) { $0.format == .jpeg }
-        // `false` means no photo event will follow.
-        guard stream.capturePhoto(format: .jpeg) else { throw GlassesError.captureFailed("capturePhoto returned false") }
-        return try await photo.data
+        let photo = Waiter(stream.photoDataPublisher) { (p: PhotoData) -> Waiter<PhotoData>.Decision in
+            p.format == .jpeg ? .accept(p) : .wait
+        }
+        // `false` means no photo event will follow: fail at once, don't wait for the timeout.
+        guard stream.capturePhoto(format: .jpeg) else {
+            photo.cancel()
+            throw GlassesError.captureFailed("capturePhoto returned false")
+        }
+        return try await photo.value(timeout: 6).data
     }
 
     private func cameraPermission() async -> Permission {
@@ -193,7 +254,7 @@ public final class DATGlassesBridge: GlassesBridge {
 
     @MainActor
     private func startVoiceInvocation(deviceID: DeviceIdentifier) {
-        guard let stream = try? VoiceInvocationsStream(wearables: Wearables.shared) else { return }
+        guard voice == nil, let stream = try? VoiceInvocationsStream(wearables: Wearables.shared) else { return }
         let c = continuation
         stream.invocationsPublisher.listen { invocation in
             guard let launch = invocation as? LaunchApp else { return }
@@ -207,11 +268,11 @@ public final class DATGlassesBridge: GlassesBridge {
     private func startInputs(on s: MWDATCore.DeviceSession) {
         guard let inputs = try? s.addInputs() else { return }
         let c = continuation
-        sessionObservers.append(Task {
+        let task = Task {
             for await event in inputs.events {
                 let id = "dat_\(event.timestampMs)"
                 switch event {
-                // Note: a captouch tap also pauses an active camera stream; the backend therefore
+                // A captouch tap also pauses an active camera stream; the backend therefore
                 // refuses gesture confirmation while streaming (DEC-007).
                 case .select: c.yield(.input(.tap, deviceEventID: id))
                 case .capture(let press, _, _): c.yield(.input(press == .hold ? .longPress : .captureButton, deviceEventID: id))
@@ -220,39 +281,32 @@ public final class DATGlassesBridge: GlassesBridge {
                 default: break
                 }
             }
-        })
-    }
-
-    // MARK: Helpers
-
-    /// First value from an SDK announcer that satisfies `match`, or a timeout.
-    private func first<T: Sendable>(_ announcer: any Announcer<T>, timeout: TimeInterval,
-                                    where match: @escaping @Sendable (T) -> Bool) async throws -> T {
-        let once = Once<T>()
-        return try await withCheckedThrowingContinuation { cont in
-            once.set(cont)
-            let token = announcer.listen { value in if match(value) { once.resume(.success(value)) } }
-            once.onFinish { Task { await token.cancel() } }
-            DispatchQueue.global().asyncAfter(deadline: .now() + timeout) {
-                once.resume(.failure(GlassesError.captureFailed("timeout")))
-            }
         }
+        lock.lock(); sessionObservers.append(task); lock.unlock()
     }
 
     // MARK: Teardown (one point)
 
-    private func teardownSession() {
-        camera?.stop()
+    /// Tears the session down under the lock. With a generation, only if it is still the
+    /// current session (a late `.stopped` from an old session must not wipe a new one).
+    private func teardownSession(ifGeneration gen: Int?) {
+        lock.lock()
+        if let gen, gen != generation { lock.unlock(); return }
+        let cam = camera, observers = sessionObservers
         camera = nil
         session = nil
-        sessionObservers.forEach { $0.cancel() }
-        sessionObservers.removeAll()
+        sessionObservers = []
+        lock.unlock()
+        cam?.stop()
+        observers.forEach { $0.cancel() }
     }
 
     private func teardown() {
-        teardownSession()
+        teardownSession(ifGeneration: nil)
         let voice = self.voice
         Task { @MainActor in voice?.stop() }
+        let old = swapDeviceToken(nil, device: nil)
+        Task { await old?.cancel() }
         tokens.clear()
         observers.forEach { $0.cancel() }
         observers.removeAll()
@@ -260,17 +314,68 @@ public final class DATGlassesBridge: GlassesBridge {
     }
 }
 
-/// Resumes a continuation exactly once (listener, timeout and capture can race).
-private final class Once<T>: @unchecked Sendable {
+// MARK: - Helpers
+
+/// Waits for the first announcer value the decision accepts (or rejects). Subscribes in init,
+/// so create it BEFORE starting whatever produces the values. Resolves exactly once; the
+/// listener token is always cancelled, even if the listener fires synchronously in `listen`.
+final class Waiter<T: Sendable>: @unchecked Sendable {
+    enum Decision { case wait, accept(T), fail(Error) }
+
     private let lock = NSLock()
-    private var cont: CheckedContinuation<T, Error>?
-    private var finish: (() -> Void)?
-    func set(_ c: CheckedContinuation<T, Error>) { lock.lock(); cont = c; lock.unlock() }
-    func onFinish(_ f: @escaping () -> Void) { lock.lock(); finish = f; lock.unlock() }
-    func resume(_ r: Result<T, Error>) {
-        lock.lock(); let c = cont; let f = finish; cont = nil; finish = nil; lock.unlock()
-        c?.resume(with: r)
-        f?()
+    private var done = false
+    private var result: Result<T, Error>?
+    private var continuation: CheckedContinuation<T, Error>?
+    private var token: (any AnyListenerToken)?
+
+    init(_ announcer: any Announcer<T>, decide: @escaping @Sendable (T) -> Decision) {
+        let t = announcer.listen { [weak self] value in
+            switch decide(value) {
+            case .wait: break
+            case .accept(let v): self?.resolve(.success(v))
+            case .fail(let e): self?.resolve(.failure(e))
+            }
+        }
+        lock.lock()
+        let alreadyDone = done
+        if !alreadyDone { token = t }
+        lock.unlock()
+        if alreadyDone { Task { await t.cancel() } }
     }
+
+    func value(timeout: TimeInterval) async throws -> T {
+        try await withCheckedThrowingContinuation { c in
+            lock.lock()
+            if let r = result { lock.unlock(); c.resume(with: r); return }
+            continuation = c
+            lock.unlock()
+            DispatchQueue.global().asyncAfter(deadline: .now() + timeout) { [weak self] in
+                self?.resolve(.failure(GlassesError.captureFailed("timeout")))
+            }
+        }
+    }
+
+    func cancel() { resolve(.failure(CancellationError())) }
+
+    private func resolve(_ r: Result<T, Error>) {
+        lock.lock()
+        guard !done else { lock.unlock(); return }
+        done = true
+        let c = continuation, t = token
+        continuation = nil
+        token = nil
+        if c == nil { result = r }
+        lock.unlock()
+        c?.resume(with: r)
+        if let t { Task { await t.cancel() } }
+    }
+}
+
+/// A thread-safe one-way flag for use inside @Sendable listener closures.
+final class Flag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = false
+    func set() { lock.lock(); value = true; lock.unlock() }
+    var isSet: Bool { lock.lock(); defer { lock.unlock() }; return value }
 }
 #endif

@@ -19,16 +19,17 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+      - name: Use the newest installed Xcode
+        run: |
+          XC=$(ls -d /Applications/Xcode_*.app | grep -viE "beta|release_candidate|_rc" | sort -V | tail -1)
+          sudo xcode-select -s "$XC/Contents/Developer"
+          xcodebuild -version
       - name: Unit tests (macOS)
         working-directory: companion-ios
         run: swift test
       - name: Type-check iOS-only code (SwiftUI, Speech, AVFoundation) for the simulator
         working-directory: companion-ios
-        run: |
-          set -o pipefail
-          xcodebuild -scheme CompanionCore-Package -destination 'generic/platform=iOS Simulator' build \
-            | grep -E "error:|warning: .*CompanionUI|BUILD (SUCCEEDED|FAILED)" || true
-          xcodebuild -scheme CompanionCore-Package -destination 'generic/platform=iOS Simulator' build -quiet
+        run: xcodebuild -scheme CompanionCore-Package -destination 'generic/platform=iOS Simulator' -quiet build
 
   app:
     name: App + Meta Mock Device Kit UI test
@@ -39,6 +40,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: "22" }
+      - name: Use the newest installed Xcode
+        run: |
+          XC=$(ls -d /Applications/Xcode_*.app | grep -viE "beta|release_candidate|_rc" | sort -V | tail -1)
+          sudo xcode-select -s "$XC/Contents/Developer"
+          xcodebuild -version
 
       - name: Start backend (fixture data, demo token)
         working-directory: backend
@@ -64,14 +70,25 @@ jobs:
           for rt in sorted(devs, key=ver, reverse=True):
               phones = [d for d in devs[rt] if d["name"].startswith("iPhone") and d.get("isAvailable")]
               if ver(rt) and phones: print(phones[0]["udid"]); break')
+          if [ -z "$UDID" ]; then echo "::error::No available iPhone simulator"; xcrun simctl list devices available; exit 1; fi
           echo "udid=$UDID" >> "$GITHUB_OUTPUT"
-          xcrun simctl list devices | grep "$UDID"
+          LINE=$(xcrun simctl list devices | grep "$UDID")
+          echo "$LINE"
+          case "$(xcrun simctl list runtimes | grep -o 'iOS [0-9]*' | sort -V | tail -1)" in
+            "iOS 1"*) echo "::warning::Newest simulator runtime is pre-iOS 26; Meta Mock Device Kit has known issues on iOS 18.0/18.5" ;;
+          esac
 
-      - name: Build and run the UI test
+      - name: Build the real app target (no Mock Device Kit linked)
+        run: |
+          xcodebuild build -quiet \
+            -project companion-ios/Xcode/Companion.xcodeproj -scheme Companion \
+            -destination "id=${{ steps.sim.outputs.udid }}"
+
+      - name: Build and run the UI test (CompanionSim + Meta Mock Device Kit)
         run: |
           set -o pipefail
           xcodebuild test \
-            -project companion-ios/Xcode/Companion.xcodeproj -scheme Companion \
+            -project companion-ios/Xcode/Companion.xcodeproj -scheme CompanionSim \
             -destination "id=${{ steps.sim.outputs.udid }}" \
             -resultBundlePath "$RUNNER_TEMP/ui.xcresult" \
             | grep -vE "^(CompileSwift|SwiftCompile|Ld |CodeSign|ProcessInfoPlist|Copy|Touch|Write|cd |export |    )"

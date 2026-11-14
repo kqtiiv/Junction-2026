@@ -25,6 +25,7 @@ public final class CompanionViewModel: ObservableObject {
     private let speechIn = SpeechInput()
     private let speechOut = SpeechOutput()
     private var turnTask: Task<Void, Never>?
+    private var startTask: Task<Void, Never>?
     private var locale: String { coordinator.config.locale }
 
     public init(coordinator: CompanionCoordinator) {
@@ -36,7 +37,15 @@ public final class CompanionViewModel: ObservableObject {
 
     // MARK: Lifecycle
 
+    /// Starts once, however many callers ask (the screen's .task and connectGlasses may race).
     public func start() async {
+        if let startTask { return await startTask.value }
+        let task = Task { await self.performStart() }
+        startTask = task
+        await task.value
+    }
+
+    private func performStart() async {
         do {
             // UI tests type their questions; system permission alerts would block them.
             if !ProcessInfo.processInfo.arguments.contains("-uiTesting") { _ = await SpeechInput.requestPermissions() }
@@ -56,9 +65,12 @@ public final class CompanionViewModel: ObservableObject {
     }
 
     public func connectGlasses() async {
+        await start()   // the session and SDK configuration must exist before connecting
+        guard started else { return }
         do {
-            // Already registered (e.g. Meta's Mock Device Kit starts registered): don't hand off to the Meta AI app again.
-            if coordinator.tracker?.registration != .registered { try await coordinator.bridge.startRegistration() }
+            // Wait for the SDK's actual registration state; the Mock Device Kit starts registered,
+            // and handing off to the Meta AI app (absent in the Simulator) would fail.
+            if await coordinator.reportedRegistration() != .registered { try await coordinator.bridge.startRegistration() }
             try await coordinator.bridge.startSession()
             await coordinator.setAudioRoute(audio.currentRoute())
         } catch { show(error) }

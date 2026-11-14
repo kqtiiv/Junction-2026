@@ -25,6 +25,8 @@ public final class DeviceStateTracker {
     public var userChosePhone = false
     public var appBackgrounded = false
     public var micPermissionDenied = false
+    /// False until the bridge has reported a registration state (the default above is a placeholder).
+    public private(set) var registrationReported = false
     private var pausedSince: Date?
     private var sticky: Set<DegradedReason> = []
     /// Glasses events arrive on another task than UI changes; serialise state and seq.
@@ -45,7 +47,7 @@ public final class DeviceStateTracker {
     public func apply(_ event: GlassesEvent, now: Date = Date()) -> Bool {
         lock.lock(); defer { lock.unlock() }
         switch event {
-        case .registration(let r): registration = r
+        case .registration(let r): registration = r; registrationReported = true
         case .availability(let a): availability = a
         case .session(let s):
             if s == .paused, session != .paused { pausedSince = now }
@@ -67,6 +69,12 @@ public final class DeviceStateTracker {
     public func mutate(_ body: (DeviceStateTracker) -> Void) {
         lock.lock(); defer { lock.unlock() }
         body(self)
+    }
+
+    /// The registration the bridge last reported, or nil if it hasn't reported one yet.
+    public func reportedRegistration() -> Registration? {
+        lock.lock(); defer { lock.unlock() }
+        return registrationReported ? registration : nil
     }
 
     /// Current mode without producing a snapshot (no seq increment).
