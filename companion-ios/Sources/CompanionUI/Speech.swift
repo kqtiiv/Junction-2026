@@ -3,6 +3,7 @@
 #if os(iOS)
 import AVFoundation
 import Speech
+import CompanionCore
 import Contracts
 
 /// Routes audio to the glasses over Bluetooth HFP *before* any camera stream starts (S04).
