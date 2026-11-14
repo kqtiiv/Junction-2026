@@ -106,7 +106,7 @@ console.log("✓ generated/ts/contracts.ts");
 // 4. Swift, Kotlin, Python via quicktype.
 const quicktype = join(ROOT, "node_modules", ".bin", process.platform === "win32" ? "quicktype.cmd" : "quicktype");
 const targets = [
-  ["swift", "swift/Contracts.swift", ["--struct-or-class", "struct", "--access-level", "public", "--protocol", "equatable"]],
+  ["swift", "swift/Contracts.swift", ["--struct-or-class", "struct", "--access-level", "public"]],
   ["kotlin", "kotlin/Contracts.kt", ["--framework", "kotlinx", "--package", "platform.contracts"]],
   ["python", "python/contracts.py", ["--python-version", "3.7"]],
 ];
