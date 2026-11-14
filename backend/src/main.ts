@@ -1,4 +1,4 @@
-// Entry point: wires the S-Bank Coach capability (fast path on fixture data until the
+// Entry point: wires the money-coach capability (fast path on fixture data until the
 // Coach team's agent exists) into the platform orchestrator and starts listening.
 import { SBankCoachAdapter } from "./capabilities/sbank-coach/adapter.ts";
 import { DeterministicFastPath } from "./capabilities/sbank-coach/fast-path.ts";
@@ -12,9 +12,9 @@ import { buildServer } from "./server.ts";
 
 /**
  * FINANCE_SOURCE selects where money figures come from:
- *   fixture      S-Bank demo numbers from contracts/examples (default; always reported as mock)
+ *   fixture      demo numbers from contracts/examples (default; always reported as mock)
  *   user_stated  no bank data: the user's weekly amount, asked for once by voice when first needed
- *   s_pankki     the S-Bank Coach team's engine on S-Pankki's dataset, via finance-engine/ at
+ *   s_pankki     the team's money engine on the Junction 2026 synthetic dataset, via finance-engine/ at
  *                FINANCE_ENGINE_URL (default http://127.0.0.1:8790); answers until payday (DEC-024, DEC-025)
  */
 export function makeEngine(source = "fixture", engineUrl = "http://127.0.0.1:8790"): FinanceEngine {

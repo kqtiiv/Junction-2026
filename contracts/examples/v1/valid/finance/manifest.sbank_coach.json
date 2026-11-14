@@ -3,7 +3,7 @@
   "capability_id": "sbank.coach",
   "version": "0.4.0",
   "contract_version": "1",
-  "display_name": { "en": "S-Bank Coach", "fi": "S-Bank Valmentaja", "sv": "S-Bank Coach" },
+  "display_name": { "en": "Money Coach", "fi": "Rahavalmentaja", "sv": "Pengacoach" },
   "intents": [
     {
       "id": "finance.safe_to_spend",

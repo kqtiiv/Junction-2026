@@ -1,6 +1,6 @@
-# finance-engine: HTTP service in front of the S-Bank Coach team's money engine
+# finance-engine: HTTP service in front of the team's money engine
 
-The S-Bank Coach team's engine is `personal-economic-trainer` (a separate repo, cloned next to this one at `../finance-agent/personal-economic-trainer`). It is the only source of money figures (DEC-019). This folder imports it **unchanged** and puts it behind our contracts (DEC-024):
+The team's money engine is `personal-economic-trainer` (a separate repo, cloned next to this one at `../finance-agent/personal-economic-trainer`). It is the only source of money figures (DEC-019). This folder imports it **unchanged** and puts it behind our contracts (DEC-024):
 
 - **Decimal strings.** The engine returns floats rounded to cents. They become decimal strings here and never cross the boundary as floats.
 - **Traceable figures.** Every result is a `platform.tool_result/v1` with a `calc_id`. The results are logged, and `GET /v1/calculations/{calc_id}` serves them back to the backend's verifier, scoped to the user.
@@ -15,7 +15,7 @@ cd finance-engine
 python3 -m venv .venv
 .venv/bin/pip install -r ../../finance-agent/personal-economic-trainer/requirements.txt -r requirements.txt
 
-# Dataset (346 MB, official S-Pankki Junction 2026 data), checksum from the team's download script
+# Dataset (346 MB, the Junction 2026 synthetic transaction data, provided by S-Pankki), checksum from the team's download script
 mkdir -p .data/raw .data/out && cd .data/raw
 curl -fLO https://raw.githubusercontent.com/hackjunction/Junction-2026-S-pankki/main/tx_customers_junction.csv
 curl -fLO https://media.githubusercontent.com/media/hackjunction/Junction-2026-S-pankki/main/tx_junction_transactions.csv

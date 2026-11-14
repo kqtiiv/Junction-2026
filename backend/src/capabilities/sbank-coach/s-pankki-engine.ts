@@ -1,4 +1,4 @@
-// S-Pankki source: the S-Bank Coach team's engine, run by finance-engine/server.py (DEC-024).
+// s_pankki source (named after the dataset's provider; DEC-026): the team's money engine, run by finance-engine/server.py (DEC-024).
 // Every figure comes from that service with a calc_id; the verifier resolves calc_ids back
 // through the service, never from a local copy. Answers are until payday, not per week (DEC-025).
 // Confirmed plans are kept here and sent as planned_total, so the service stays stateless.

@@ -373,7 +373,7 @@ export class DeterministicFastPath implements AgentBackend {
     return this.reply(req, "answered", text, kind, [card], proposals, [result, sts]);
   }
 
-  /** Affordability on the S-Bank Coach engine: what the purchase leaves per day until payday (DEC-025). */
+  /** Affordability on the team's money engine: what the purchase leaves per day until payday (DEC-025). */
   private paydayAffordability(req: DomainRequest, result: ToolResult, sts: ToolResult, amount: string,
     source: "stated_amount" | "observation", observation?: Observation, label?: string): DomainResponse {
     const r = result.result as PaydayAffordability;
@@ -522,7 +522,7 @@ export class DeterministicFastPath implements AgentBackend {
   }
 }
 
-// ---- Until payday (S-Bank Coach engine, DEC-025) ---------------------------------------------
+// ---- Until payday (the team's money engine, DEC-025) ---------------------------------------------
 
 type PaydaySts = {
   balance: Money; next_payday: string; days_to_payday: number; reserved: Record<string, Money>;

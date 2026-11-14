@@ -1,4 +1,4 @@
-"""HTTP service in front of the S-Bank Coach team's money engine (DEC-024).
+"""HTTP service in front of the team's money engine (DEC-024).
 
     finance-engine/.venv/bin/uvicorn server:app --app-dir finance-engine --port 8790
 

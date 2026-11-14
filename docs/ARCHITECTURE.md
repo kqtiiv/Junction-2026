@@ -1,7 +1,9 @@
-# Glasses-to-Action Platform: Architecture with S-Bank Coach as the First Capability
+# Glasses-to-Action Platform (Spendtacles): Architecture with the Money Coach as the First Capability
 
 *Junction 2026 · Platform design v1.1 · updated 2026-11-14*
 
+> **Since DEC-026 (2026-11-14), S-Bank is not part of the project.** Wherever this document says "S-Bank Coach", read **the money coach**: the finance capability built on our teammate's engine. Internal identifiers (`sbank.coach`, `SBankCoachAdapter`, `s_pankki`) keep the old name until a rename after the hackathon. S-Bank-specific plans (S-Pankki PSD2 sandbox, S Group receipts) are out of scope.
+>
 > **Document map:**
 > - **This document** is the platform architecture.
 > - **Why each choice was made:** [`ARCHITECTURE_DECISION_LOG.md`](./ARCHITECTURE_DECISION_LOG.md) (DEC-###).
@@ -181,7 +183,7 @@ sequenceDiagram
   participant E as Finance engine (L6)
 
   alt exp_voice_invocation on
-    U->>G: "Hey Meta, start S-Bank Coach"
+    U->>G: "Hey Meta, start Spendtacles"
     G->>P: LaunchApp (no utterance) → acknowledge once
   else fallback
     U->>P: capture button / phone push-to-talk
@@ -1022,7 +1024,7 @@ The platform's fixture runner replays the golden files through the **adapter** (
 | Must build | Mock / seed | Defer |
 |---|---|---|
 | Native companion (**one OS**, the one the glasses are paired with): DAT registration, the four-lifecycle tracker publishing `DeviceSessionState`, audio route manager (HFP mic → device ASR, TTS → glasses), SDK telemetry opt-out | Persona ledger, balance, payday, bills (`demo_seed`), frozen "today" 19.11.2026 | Local / on-device LLM (keep the `OnDeviceAgentBackend` stub + `ModelProvider` entry) |
-| Invocation: *"Hey Meta, start S-Bank Coach"* (experimental, launch only) → earcon → our ASR listens. Capture button / phone push-to-talk as the publishable fallback. All decided by the **hour-0 device gate** (DEC-021, DEC-022). | Education corpus: ~10 hand-written explainer snippets | Meta AI Connectors |
+| Invocation: *"Hey Meta, start Spendtacles"* (experimental, launch only) → earcon → our ASR listens. Capture button / phone push-to-talk as the publishable fallback. All decided by the **hour-0 device gate** (DEC-021, DEC-022). | Education corpus: ~10 hand-written explainer snippets | Meta AI Connectors |
 | One glasses capture: short stream → `capturePhoto` → stop → orient → strip → `ContextCapture` → Observation (DEC-006) | Receipt extraction: live, with a **fixture fallback** keyed to the demo receipt | Ray-Ban Display renderer (only if a Display device is present; the cards already carry `glasses_display_lines`) |
 | Orchestrator: turn manager (routing on transcript, abort propagation), device-state store, policy check, consent check, proposal ledger + signed confirmations, response composer (speech budget), `ErrorEnvelope` on failures | Consent: one combined consent screen at first launch | Multi-capability routing (a stub router with one capability) |
 | Contracts package (JSON Schema + generated types) for §3 | Notification delivery (show one `DomainEvent` as an in-app banner) | Production publishing, real bank integration, PSD2 |
@@ -1037,7 +1039,7 @@ The platform's fixture runner replays the golden files through the **adapter** (
 
 | Proof | Demo moment |
 |---|---|
-| Interaction started from Ray-Ban Meta | Presenter says *"Hey Meta, start S-Bank Coach."* Earcon in the glasses: the app is listening. Looking at a shelf label (wireless headphones, 79,90 €), they ask *"Can I afford this?"* The answer comes from the S-Bank Coach engine on S-Pankki's dataset: what the purchase leaves per day until payday (DEC-024, DEC-025). Voice invocation only launches the app (DEC-021) and is **experimental** (DEC-004). If the hour-0 gate turned it off, the presenter presses the capture button or uses phone push-to-talk instead. The overlay shows the active experimental features. |
+| Interaction started from Ray-Ban Meta | Presenter says *"Hey Meta, start Spendtacles."* Earcon in the glasses: the app is listening. Looking at a shelf label (wireless headphones, 79,90 €), they ask *"Can I afford this?"* The answer comes from the team's money engine on the Junction 2026 dataset: what the purchase leaves per day until payday (DEC-024, DEC-025). Voice invocation only launches the app (DEC-021) and is **experimental** (DEC-004). If the hour-0 gate turned it off, the presenter presses the capture button or uses phone push-to-talk instead. The overlay shows the active experimental features. |
 | One capture/voice event | The glasses photo appears in the phone UI as an Observation (*"Read: 79,90 € · observed"*) with a "photo not kept" chip. The finance capability never receives the image. |
 | Request through the domain adapter | Debug overlay shows `capability: sbank.coach · backend: remote_agent@0.4 · verified ✓ · 1.9 s`. |
 | Grounded finance answer | Card with `calc_aff_40` + `calc_sts_91`; tap **How was this calculated?** |

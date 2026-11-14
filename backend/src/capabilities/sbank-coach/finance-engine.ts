@@ -1,7 +1,7 @@
 // The finance engine seam (L6). Three data sources implement it:
-//   fixture      seeded from contracts/examples (the S-Bank demo numbers), always a mock; per week;
+//   fixture      seeded from contracts/examples (the demo numbers), always a mock; per week;
 //   user_stated  no bank data at all: the user's own weekly amount, asked for once by voice; per week;
-//   s_pankki     the S-Bank Coach team's engine on S-Pankki's dataset, over HTTP (DEC-024); until payday (DEC-025).
+//   s_pankki     the team's money engine on the Junction 2026 dataset, over HTTP (DEC-024); until payday (DEC-025).
 // Later: an open-banking aggregator source behind the same interface.
 import type { ToolResult } from "../../contracts.ts";
 import type { UserScopedCalculationResolver } from "../../sdk/verifier.ts";

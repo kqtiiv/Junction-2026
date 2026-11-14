@@ -1,4 +1,4 @@
-// Fixture finance engine: a stand-in for the S-Bank Coach team's deterministic engine
+// Fixture finance engine: a stand-in for the team's deterministic money engine
 // (L6), seeded from contracts/examples so the numbers match the documented demo story.
 // It is always reported as a mock (DEC-005). Arithmetic is exact (integer cents).
 // Thresholds follow docs/finance/REFERENCE_DESIGN.md §6.4: FITS if ≥25 % of the week's

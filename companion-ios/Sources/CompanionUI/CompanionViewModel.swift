@@ -59,7 +59,7 @@ public final class CompanionViewModel: ObservableObject {
     }
 
     /// The combined first-launch consent (ARCHITECTURE.md §2.5). Data classes and purposes are
-    /// the S-Bank Coach manifest's; the consent screen lists them in plain words.
+    /// the money coach manifest's; the consent screen lists them in plain words.
     public func grantConsent() async {
         do {
             try await coordinator.recordConsent(dataClasses: ["financial_transactions", "observed_prices"], purposes: ["price_label"])

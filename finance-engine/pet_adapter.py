@@ -1,4 +1,4 @@
-"""Boundary between the S-Bank Coach team's money engine and our contracts.
+"""Boundary between the team's money engine and our contracts.
 
 The engine (../finance-agent/personal-economic-trainer, src/engine.py) is the only source of
 money figures (DEC-019). This module imports it unchanged and converts what it returns:

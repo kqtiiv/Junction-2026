@@ -150,7 +150,7 @@ public struct ConsentView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Before we start").font(.largeTitle.bold())
-            Text("S-Bank Coach uses:")
+            Text("Spendtacles uses:")
             Label("Your transactions, to answer questions about your money", systemImage: "list.bullet.rectangle")
             Label("Prices read from photos you choose to take. The photo is deleted as soon as the price is read.", systemImage: "camera")
             Text("Answers are calculated from your data and labelled as facts or estimates. Nothing is bought or paid on your behalf. You can withdraw this permission at any time.")
@@ -223,7 +223,7 @@ public struct CompanionScreen: View {
                     }
                 }
                 .safeAreaInset(edge: .bottom) { controls }
-                .navigationTitle("S-Bank Coach")
+                .navigationTitle("Spendtacles")
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
                         Menu {

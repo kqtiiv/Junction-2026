@@ -37,6 +37,7 @@ The canonical record of every material decision on the glasses platform and its 
 | [DEC-023](#dec-023--capture-turns-get-their-own-latency-budget-the-device-session-stays-warm-the-camera-stream-does-not) | Capture turns get their own latency budget; the device session stays warm, the camera stream does not | accepted | companion |
 | [DEC-024](#dec-024--the-s-bank-coach-teams-python-engine-runs-behind-a-thin-http-service-that-converts-to-our-contracts) | The S-Bank Coach team's Python engine runs behind a thin HTTP service that converts to our contracts | accepted | finance |
 | [DEC-025](#dec-025--money-answers-follow-the-engine-safe-to-spend-today-until-payday-not-per-week) | Money answers follow the engine: safe to spend today, until payday, not per week | accepted | finance |
+| [DEC-026](#dec-026--s-bank-is-dropped-from-the-project-the-finance-capability-becomes-the-teams-money-coach) | S-Bank is dropped from the project; the finance capability becomes the team's money coach | accepted | platform |
 
 ---
 
@@ -1431,3 +1432,58 @@ The canonical record of every material decision on the glasses platform and its 
 
 ### Revisit triggers
 - Revisit this decision if the team adds a weekly view or an `affordability()` function to the engine, or if real bank data replaces the simulated date.
+
+---
+
+## DEC-026 — S-Bank is dropped from the project; the finance capability becomes the team's money coach
+
+- Status: accepted
+- Date: 2026-11-14
+- Owner: whole team (decided by the project owner)
+- Scope: platform
+- Decision:
+  - S-Bank is no longer a partner or a target of the project. The project is entered only in *AI Glasses for Everyone, Everyday*, under the name Spendtacles.
+  - The finance capability is "the money coach", built on our teammate's engine. User-facing text carries no S-Bank name or branding: the app title, the consent screen, the capability display name ("Money Coach" / "Rahavalmentaja" / "Pengacoach"), the README and the submission.
+  - Internal identifiers keep the old name for now: `sbank.coach`, `SBankCoachAdapter`, `backend/src/capabilities/sbank-coach/`, the `s_pankki` finance source and the manifest file name.
+  - S-Bank-specific plans are out of scope: the S-Pankki PSD2 sandbox (S15, S16) and S Group receipt data.
+
+### Context
+- **Problem being solved:** the project owner decided to drop S-Bank (README and submission already updated in `e70444a`). The architecture, the demo script and the app UI still named S-Bank.
+- **Requirements and constraints:** no silent material decisions; no breaking contract changes within v1 during the hackathon.
+- **Assumptions:**
+  - [assumption] Teams outside the S-Pankki challenge may still use the Junction 2026 transaction dataset (S22). The dataset repo has no licence and no usage note. **Verify with the organisers**; if not, `user_stated` becomes the demo source.
+  - [assumption] "Hey Meta, start Spendtacles" depends on the app name registered in the Meta developer setup (DEC-021).
+- **Non-goals:** renaming internal identifiers before the hackathon ends.
+
+### Options considered
+| Option | Advantages | Disadvantages | Why accepted or rejected |
+|---|---|---|---|
+| Drop the branding now; keep internal identifiers | Small, safe change; nothing user-facing says S-Bank | Code and contracts keep an outdated name | **Accepted** |
+| Full rename now (`capability_id`, adapter, folders, `s_pankki`, manifest) | Clean | Touches contracts, generated types, iOS, tests and examples hours before judging; `capability_id` is a value consumers match on | Rejected for now |
+| Keep S-Bank | No change | Against the project owner's decision | Rejected |
+
+### Evidence and sources
+| Source | Type | Specific finding used | Why this source is trustworthy | Accessed |
+|---|---|---|---|---|
+| Commit `e70444a` (https://github.com/kqtiiv/Spendtacles) | Project history | [fact] "S-Bank is no longer part of the project"; README and submission rewritten | The project's own record | 2026-11-14 |
+| User instruction, 2026-11-14 | Project owner | [fact] Dropping S-Bank is intended | Owner decision | 2026-11-14 |
+| S22 dataset README (https://github.com/hackjunction/Junction-2026-S-pankki) | Challenge data | [fact] No licence or usage terms stated | Organisers' repo | 2026-11-14 |
+
+### Implementation
+- **Components affected:** `companion-ios/Sources/CompanionUI/Views.swift` (title and consent screen), the manifest example's `display_name`, code comments, `docs/ARCHITECTURE.md` (title, a terminology note, the invocation phrase), backend and `finance-engine` READMEs, `SOURCES.md` caveats.
+- **Contracts or schemas affected:** none. The manifest example changes only its display name.
+- **Configuration / feature flags:** none.
+- **Tests or demo checks required:** contract check and backend suite; the iOS UI test does not assert the title.
+- **Migration or rollback plan:** a later rename moves the internal identifiers in one change (a v2 manifest is not needed for a new `capability_id`, but every consumer must switch together).
+
+### Consequences
+- **Benefits:** the pitch and the app say the same thing; no implied sponsor relationship.
+- **Costs and limitations:**
+  - Internal names no longer match the product.
+  - Entries DEC-001 to DEC-025 still say "S-Bank Coach". They are records of their time; read the term as "the money coach".
+- **Failure behavior:** unchanged.
+- **Security/privacy implications:** none.
+- **What this intentionally does not solve:** real bank connectivity, which now needs a different provider.
+
+### Revisit triggers
+- Revisit this decision after the hackathon (do the rename), or if the organisers say the dataset is only for the S-Pankki challenge (switch the demo to `user_stated`).
