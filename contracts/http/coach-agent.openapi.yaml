@@ -1,0 +1,91 @@
+openapi: 3.1.0
+info:
+  title: S-Bank Coach agent (capability endpoint)
+  version: 1.0.0
+  description: |
+    The whole coupling surface between the platform and the separately built S-Bank Coach agent.
+    The agent may use any model, prompt, framework, RAG stack or database behind this API.
+
+    Rules the platform enforces regardless of implementation:
+    - Every number in `speech` or `cards` must trace to a `calc_id` in `trace.calc_ids`;
+      the adapter resolves each one via GET /v1/calculations/{calc_id} and drops anything unverified.
+    - The agent sends `trace.verified: false`; only the platform adapter sets it to true.
+    - The agent never applies a change itself. It returns ActionProposals and applies them only
+      on POST /v1/confirm with a valid platform signature and matching payload hash.
+servers:
+  - url: https://coach.internal.example
+paths:
+  /v1/turn:
+    post:
+      summary: Answer one user turn
+      description: |
+        Respond with `text/event-stream` (preferred) or `application/json` based on the Accept header.
+        SSE: each event is `data: <DomainResponseEvent JSON>\n\n`; exactly one `final` event ends the stream.
+        Answer within `deadline_ms`, or the platform falls back to its deterministic fast path.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "../schemas/v1/domain_request.schema.json" }
+      responses:
+        "200":
+          description: Answer
+          content:
+            text/event-stream:
+              schema: { $ref: "../schemas/v1/domain_response_event.schema.json" }
+            application/json:
+              schema: { $ref: "../schemas/v1/domain_response.schema.json" }
+        "422":
+          description: Request failed schema validation
+  /v1/confirm:
+    post:
+      summary: Apply (or discard) a proposal the user has confirmed or rejected
+      description: Verify the JWS signature with the platform public key and the payload hash before applying.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "../schemas/v1/user_confirmation.schema.json" }
+      responses:
+        "200":
+          description: Outcome
+          content:
+            application/json:
+              schema: { $ref: "../schemas/v1/action_result.schema.json" }
+  /v1/calculations/{calc_id}:
+    get:
+      summary: Resolve a calculation id (used by the adapter to verify numbers independently)
+      description: May be served by the finance engine rather than the agent. Must be user-scoped (404 for other users' ids).
+      parameters:
+        - { name: calc_id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: The logged tool result
+          content:
+            application/json:
+              schema: { $ref: "../schemas/v1/finance/finance_tool_result.schema.json" }
+        "404":
+          description: Unknown or not visible to this user
+  /v1/manifest:
+    get:
+      summary: Capability manifest
+      responses:
+        "200":
+          description: Manifest
+          content:
+            application/json:
+              schema: { $ref: "../schemas/v1/finance/finance_manifest.schema.json" }
+  /v1/health:
+    get:
+      summary: Liveness and version
+      responses:
+        "200":
+          description: Health
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, version]
+                properties:
+                  status: { type: string, enum: [ok, degraded, down] }
+                  version: { type: string }

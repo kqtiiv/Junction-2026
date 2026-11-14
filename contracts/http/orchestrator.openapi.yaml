@@ -1,0 +1,117 @@
+openapi: 3.1.0
+info:
+  title: Platform orchestrator (companion-facing API)
+  version: 1.0.0
+  description: |
+    What the native companion app (and the phone-only fallback UI) calls. Domain-agnostic:
+    nothing here mentions finance. The companion authenticates with a session cookie or bearer token;
+    `user_ref` is always taken from the session, never trusted from the body.
+servers:
+  - url: https://platform.internal.example
+paths:
+  /v1/sessions:
+    post:
+      summary: Start or resume a session after the glasses connect (or in phone-only mode)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mode, device_capabilities, locale]
+              properties:
+                mode: { type: string, enum: [glasses, phone_only] }
+                device_capabilities:
+                  type: array
+                  items: { $ref: "../schemas/v1/common.schema.json#/definitions/DeviceCapability" }
+                locale: { $ref: "../schemas/v1/common.schema.json#/definitions/Locale" }
+      responses:
+        "200":
+          description: Session
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [session_id, conversation_ref]
+                properties:
+                  session_id: { $ref: "../schemas/v1/common.schema.json#/definitions/Ref" }
+                  conversation_ref: { $ref: "../schemas/v1/common.schema.json#/definitions/Ref" }
+  /v1/captures:
+    post:
+      summary: Upload a minimised capture (EXIF already stripped on the phone)
+      description: The server stores the image ephemerally and returns the ContextCapture to attach to the next turn.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [image, meta]
+              properties:
+                image: { type: string, contentMediaType: image/jpeg }
+                meta:
+                  type: object
+                  required: [session_id, source, trigger, purpose, minimisation, consent_grant_id, captured_at, locale]
+                  properties:
+                    session_id: { $ref: "../schemas/v1/common.schema.json#/definitions/Ref" }
+                    source: { type: string, enum: [glasses_photo, glasses_stream_frame, phone_camera, phone_upload] }
+                    trigger: { type: string, enum: [voice_command, glasses_input, phone_tap] }
+                    purpose: { type: string }
+                    minimisation: { type: array, items: { type: string } }
+                    consent_grant_id: { $ref: "../schemas/v1/common.schema.json#/definitions/Ref" }
+                    captured_at: { $ref: "../schemas/v1/common.schema.json#/definitions/Timestamp" }
+                    locale: { $ref: "../schemas/v1/common.schema.json#/definitions/Locale" }
+      responses:
+        "201":
+          description: Stored
+          content:
+            application/json:
+              schema: { $ref: "../schemas/v1/context_capture.schema.json" }
+        "403":
+          description: No consent for this capture purpose
+  /v1/turns:
+    post:
+      summary: Send one user turn (voice, typed, or a glasses gesture)
+      description: |
+        Returns the composed answer as SSE, using the same DomainResponseEvent union a capability
+        produces, after the platform has applied the speech budget, discreet mode and verification.
+        Platform intents (confirm, cancel, repeat, show_on_phone, next_card, stop) are handled
+        here without calling a capability.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "../schemas/v1/voice_intent.schema.json" }
+      responses:
+        "200":
+          description: Streamed answer
+          content:
+            text/event-stream:
+              schema: { $ref: "../schemas/v1/domain_response_event.schema.json" }
+  /v1/confirmations:
+    post:
+      summary: Record the user's decision on a proposal
+      description: |
+        The companion sends the decision and evidence from a real UI tap, glasses input or voice
+        read-back. The platform validates it against the proposal's allowed channels, signs a
+        UserConfirmation and forwards it to the capability. Rejected while offline.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [proposal_id, decision, channel, evidence]
+              properties:
+                proposal_id: { $ref: "../schemas/v1/common.schema.json#/definitions/Ref" }
+                decision: { type: string, enum: [confirm, reject] }
+                channel: { $ref: "../schemas/v1/common.schema.json#/definitions/ConfirmChannel" }
+                evidence: { type: object }
+      responses:
+        "200":
+          description: Outcome from the capability
+          content:
+            application/json:
+              schema: { $ref: "../schemas/v1/action_result.schema.json" }
+        "409":
+          description: Proposal expired, already decided, or channel not allowed for this proposal
