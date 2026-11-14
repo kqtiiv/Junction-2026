@@ -59,6 +59,66 @@ paths:
           content:
             application/json:
               schema: { $ref: "../schemas/v1/error_envelope.schema.json" }
+  /v1/consents:
+    post:
+      summary: Record the user's consent grant from the consent screen (ARCHITECTURE.md §2.5)
+      description: |
+        The companion shows the data classes and capture purposes from the capability manifest; on
+        "Allow" it records the grant here and keeps the returned id for capture uploads. Every capture
+        and domain request is checked against active grants (fail closed). The full `ConsentGrant`
+        contract, read-only scopes and purge semantics remain proposed in DEC-014; this is the minimum
+        the capture flow needs.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [capability_id, data_classes, purposes]
+              additionalProperties: false
+              properties:
+                capability_id: { $ref: "../schemas/v1/common.schema.json#/definitions/CapabilityId" }
+                data_classes:
+                  type: array
+                  minItems: 1
+                  items: { type: string, pattern: "^[a-z][a-z0-9_]*$" }
+                purposes:
+                  description: Capture purposes covered, e.g. price_label, receipt
+                  type: array
+                  items: { type: string, pattern: "^[a-z][a-z0-9_]*$" }
+      responses:
+        "201":
+          description: Grant recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [consent_grant_id, capability_id, data_classes, purposes, granted_at]
+                properties:
+                  consent_grant_id: { $ref: "../schemas/v1/common.schema.json#/definitions/Ref" }
+                  capability_id: { $ref: "../schemas/v1/common.schema.json#/definitions/CapabilityId" }
+                  data_classes: { type: array, items: { type: string } }
+                  purposes: { type: array, items: { type: string } }
+                  granted_at: { $ref: "../schemas/v1/common.schema.json#/definitions/Timestamp" }
+        "422":
+          description: Unknown capability, or a data class or purpose the manifest does not declare
+          content:
+            application/json:
+              schema: { $ref: "../schemas/v1/error_envelope.schema.json" }
+  /v1/consents/{consent_grant_id}:
+    delete:
+      summary: Revoke a grant
+      description: Captures and observations made under the grant are deleted immediately. Later uses of the id fail with `CONSENT_REVOKED`.
+      parameters:
+        - { name: consent_grant_id, in: path, required: true, schema: { $ref: "../schemas/v1/common.schema.json#/definitions/Ref" } }
+      responses:
+        "204":
+          description: Revoked (idempotent)
+        "404":
+          description: Unknown grant
+          content:
+            application/json:
+              schema: { $ref: "../schemas/v1/error_envelope.schema.json" }
   /v1/captures:
     post:
       summary: Upload a minimised capture (EXIF already stripped on the phone)

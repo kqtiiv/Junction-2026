@@ -16,7 +16,7 @@ const BASE_ID = "https://contracts.example/v1/";
 export type SchemaName =
   | "action_proposal" | "action_result" | "capability_manifest" | "context_capture"
   | "device_session_state" | "domain_event" | "domain_request" | "domain_response"
-  | "domain_response_event" | "error_envelope" | "insight_card" | "observation"
+  | "domain_response_event" | "error_envelope" | "insight_card" | "model_provider" | "observation"
   | "tool_result" | "user_confirmation" | "voice_intent"
   | "finance/finance_manifest" | "finance/finance_tool_result";
 

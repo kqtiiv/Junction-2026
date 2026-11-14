@@ -4,7 +4,7 @@ Implements `contracts/http/orchestrator.openapi.yaml` (L3) and the S-Bank Coach 
 
 ```bash
 npm install
-npm test            # 28 tests: demo path, confirmation rules, abort, timeout fallback, invented numbers
+npm test            # 39 tests: demo path, captures, consent, confirmation rules, abort, timeout fallback, invented numbers
 npm run typecheck
 npm run dev         # http://0.0.0.0:8787  (phone on the same network can reach it)
 ```
@@ -18,6 +18,8 @@ Try it: `curl -H 'authorization: Bearer demo-token' localhost:8787/health`
 | `GET /health` | Capability health, including `mock: true` while fixtures answer (DEC-005) |
 | `POST /v1/sessions` | Creates a session |
 | `PUT /v1/sessions/{id}/device-state` | Validates `DeviceSessionState`, keeps the highest `seq`, ignores stale snapshots |
+| `POST /v1/consents`, `DELETE /v1/consents/{id}` | Records a grant (only data classes and purposes the manifest declares); revoking deletes captures made under it |
+| `POST /v1/captures` | Multipart upload. Checks consent for the purpose, refuses glasses captures in `phone_only`, rejects photos that still carry EXIF, reads the label into an `Observation`, and deletes the image at once when the capability declared retention 0 |
 | `POST /v1/turns` (SSE) | Validates `VoiceIntent`, routes to a capability, streams `card` / `proposal` / `final` events, or an `error` event with an `ErrorEnvelope` |
 | `POST /v1/confirmations` | Policy-checks, signs (ES256 JWS) and forwards a `UserConfirmation`; returns `ActionResult` |
 
@@ -25,17 +27,21 @@ Platform intents handled in `/v1/turns` without a capability: `stop`/`cancel` (a
 
 Every outgoing event is validated against the JSON Schemas before it is sent.
 
+**Consent is fail-closed** (ARCHITECTURE.md §2.5): a domain turn needs an active grant for the capability, so the companion records the combined consent at first launch (`POST /v1/consents`) before the first question. Attached captures reach the capability as `Observation`s, never as the photo, unless its manifest declares `delivery: "media"`.
+
 ## What answers the questions today
 
 The **deterministic fast path** on a **fixture finance engine**, both flagged `mock` everywhere:
 - `finance.safe_to_spend`: "what's safe to spend this week" / "paljonko voin käyttää tällä viikolla"
-- `finance.basket.affordability` with a stated amount: "can I afford 79.90 this week"; a confirmed plan reduces the week's allowance
+- `finance.basket.affordability` with a stated amount ("can I afford 79.90 this week") or a price-label capture ("does this fit my week?" / "mahtuuko tämä viikon budjettiin"); a confirmed plan reduces the week's allowance
+
+The **label reader is a fixture** too: it returns the demo €79.90 label whatever the photo shows, and `/health` reports it as `mock`.
 
 Numbers come from `contracts/examples` (€90.16 safe to spend). Every spoken number and card value is verified against the engine's calculation log before it is sent. A remote agent that invents numbers has them dropped (`test/adapter.test.ts`).
 
 ## Not built yet
 
-- `POST /v1/captures` and observations (price-label photos). Turns with `attached_capture_ids` are refused with a speakable `DEVICE_UNAVAILABLE`.
+- A real label reader (cloud vision model or on-device OCR) behind the `LabelReader` / `vision_ocr` slot.
 - The HTTP client for the Coach team's agent (`RemoteAgentBackend`). The adapter's backend policy, deadline fallback and verification are built and tested against a fake agent.
 - Undo, persistence, the receipt flow, spend queries.
 

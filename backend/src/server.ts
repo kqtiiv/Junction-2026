@@ -1,12 +1,16 @@
 // Platform orchestrator HTTP API (L3). Implements contracts/http/orchestrator.openapi.yaml.
-// Captures (POST /v1/captures) are not implemented yet: they need a consent-grant source
-// and a label reader, which are open decisions.
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import multipart from "@fastify/multipart";
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import {
-  validate, type DomainRequest, type DomainResponse, type DomainResponseEvent, type ErrorEnvelope, type VoiceIntent,
+  validate, type ContextCapture, type DomainRequest, type DomainResponse, type DomainResponseEvent, type ErrorEnvelope,
+  type Observation, type VoiceIntent,
 } from "./contracts.ts";
 import type { SigningKeys } from "./crypto.ts";
+import { CaptureStore, CAPTURE_TTL_MS } from "./platform/captures.ts";
+import { ConsentRegistry } from "./platform/consent.ts";
+import { inspectImage, MAX_IMAGE_BYTES } from "./platform/image.ts";
+import { FixtureLabelReader, type LabelReader } from "./platform/label-reader.ts";
 import { PlatformError } from "./errors.ts";
 import { composeSpeech } from "./platform/composer.ts";
 import { confirmProposal, type ConfirmRequest } from "./platform/confirmations.ts";
@@ -20,6 +24,8 @@ export interface ServerDeps {
   tokens: Map<string, string>;
   deadlineMs?: number;
   logger?: boolean;
+  /** Reads labels from captures. Defaults to the fixture reader (mock). */
+  labelReader?: LabelReader;
 }
 
 const SPEECH_MAX_WORDS = 25;
@@ -34,6 +40,10 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   const sessions = new SessionStore();
   const ledger = new ProposalLedger();
   const turns = new TurnLog();
+  const consents = new ConsentRegistry();
+  const captures = new CaptureStore();
+  const labelReader = deps.labelReader ?? new FixtureLabelReader();
+  void app.register(multipart, { limits: { fileSize: MAX_IMAGE_BYTES, files: 1, fields: 4 } });
 
   const sendError = (reply: FastifyReply, err: PlatformError) => {
     const env = err.toEnvelope();
@@ -44,7 +54,10 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   app.setErrorHandler((err, _req, reply) => {
     if (err instanceof PlatformError) return sendError(reply, err);
     const e = err as { validation?: unknown; statusCode?: number };
-    if (e.validation || e.statusCode === 400) return sendError(reply, new PlatformError("VALIDATION_FAILED", { detail: String(err) }));
+    if (e.statusCode === 413) return sendError(reply, new PlatformError("CAPTURE_UNUSABLE", { detail: String(err) }));
+    if (e.validation || (e.statusCode && e.statusCode >= 400 && e.statusCode < 500)) {
+      return sendError(reply, new PlatformError("VALIDATION_FAILED", { detail: String(err) }));
+    }
     app.log.error(err);
     return sendError(reply, new PlatformError("INTERNAL", { detail: String(err) }));
   });
@@ -71,6 +84,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   // ---------------------------------------------------------------- health
   app.get("/health", async () => ({
     status: "ok",
+    label_reader: { provider_id: labelReader.provider.provider_id, mock: labelReader.mock },
     capabilities: await Promise.all(deps.registry.all().map(async (c) => ({
       capability_id: c.manifest.capability_id, ...(await c.adapter.health()),
     }))),
@@ -95,6 +109,80 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     if (state.session_id !== session.sessionId) throw new PlatformError("VALIDATION_FAILED", { detail: "session_id mismatch" });
     sessions.putDeviceState(session, state); // stale snapshots are accepted and ignored
     return reply.code(204).send();
+  });
+
+  // ---------------------------------------------------------------- consent
+  app.post("/v1/consents", async (req, reply) => {
+    const body = req.body as { capability_id?: string; data_classes?: unknown; purposes?: unknown };
+    const cap = body?.capability_id ? deps.registry.get(body.capability_id) : undefined;
+    if (!cap || !Array.isArray(body.data_classes) || !Array.isArray(body.purposes)) {
+      throw new PlatformError("VALIDATION_FAILED", { detail: "capability_id, data_classes and purposes are required" });
+    }
+    const g = consents.grant(req.userRef!, cap.manifest, body.data_classes as string[], body.purposes as string[]);
+    const { user_ref: _u, revoked_at: _r, ...pub } = g;
+    return reply.code(201).send(pub);
+  });
+
+  app.delete<{ Params: { consent_grant_id: string } }>("/v1/consents/:consent_grant_id", async (req, reply) => {
+    consents.revoke(req.userRef!, req.params.consent_grant_id);
+    const purged = captures.purgeGrant(req.params.consent_grant_id);
+    app.log.info({ consent_grant_id: req.params.consent_grant_id, purged }, "consent revoked");
+    return reply.code(204).send();
+  });
+
+  // ---------------------------------------------------------------- captures
+  app.post("/v1/captures", async (req, reply) => {
+    if (!req.isMultipart()) throw new PlatformError("VALIDATION_FAILED", { detail: "multipart/form-data required" });
+    let image: Buffer | undefined;
+    let metaRaw: string | undefined;
+    for await (const part of req.parts()) {
+      if (part.type === "file" && part.fieldname === "image") image = await part.toBuffer();
+      else if (part.type === "field" && part.fieldname === "meta") metaRaw = String(part.value);
+    }
+    if (!image || !metaRaw) throw new PlatformError("VALIDATION_FAILED", { detail: "image and meta parts are required" });
+    let meta: Omit<ContextCapture, "schema" | "capture_id" | "user_ref" | "media">;
+    try { meta = JSON.parse(metaRaw); } catch { throw new PlatformError("VALIDATION_FAILED", { detail: "meta is not JSON" }); }
+
+    const session = requireSession(meta.session_id, req.userRef!);
+    const purposeOwner = deps.registry.all().find((c) => c.manifest.capture_purposes.some((p) => p.purpose === meta.purpose));
+    if (!purposeOwner) throw new PlatformError("VALIDATION_FAILED", { detail: `no capability declares purpose ${meta.purpose}` });
+    consents.requireForCapture(req.userRef!, meta.consent_grant_id, meta.purpose);
+    if (String(meta.source).startsWith("glasses_") && session.deviceState?.mode === "phone_only") {
+      throw new PlatformError("DEVICE_UNAVAILABLE", { detail: "glasses capture while phone_only" });
+    }
+
+    const info = inspectImage(image);
+    if (info.hasExif) throw new PlatformError("CAPTURE_UNUSABLE", { detail: "EXIF metadata still present; strip it on the phone" });
+
+    const captureId = `cap_${randomUUID().slice(0, 8)}`;
+    const capture: ContextCapture = {
+      schema: "platform.context_capture/v1",
+      capture_id: captureId,
+      session_id: session.sessionId,
+      user_ref: req.userRef!,
+      source: meta.source,
+      trigger: meta.trigger,
+      purpose: meta.purpose,
+      media: {
+        kind: "image", mime: info.mime, width: info.width, height: info.height,
+        sha256: `sha256:${createHash("sha256").update(image).digest("hex")}`,
+        uri: `media://ephemeral/${captureId}`,
+        expires_at: new Date(Date.now() + CAPTURE_TTL_MS).toISOString(),
+      },
+      minimisation: meta.minimisation,
+      consent_grant_id: meta.consent_grant_id,
+      captured_at: meta.captured_at,
+      locale: meta.locale,
+    };
+    requireValid("context_capture", capture); // enforces e.g. exif_stripped in minimisation, 4096 px cap
+    captures.put(capture, req.userRef!, image);
+
+    const decl = purposeOwner.manifest.capture_purposes.find((p) => p.purpose === meta.purpose)!;
+    if (decl.delivery === "observation") {
+      captures.setObservation(captureId, await labelReader.read(capture, image));
+      if (decl.retention_max_s === 0) captures.deleteImage(captureId); // the capability never needs the photo
+    }
+    return reply.code(201).send(capture);
   });
 
   // ---------------------------------------------------------------- confirmations
@@ -209,9 +297,23 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   async function handleDomainTurn(intent: VoiceIntent, session: Session, locale: string, emit: (e: DomainResponseEvent) => void, raw: FastifyReply["raw"]) {
     const cap = deps.registry.route(intent.transcript?.text, intent.capability_hint, intent.context.active_capability);
     const capabilityId = cap.manifest.capability_id;
-    if (intent.attached_capture_ids.length > 0) {
-      throw new PlatformError("DEVICE_UNAVAILABLE", { capabilityId, detail: "captures are not implemented yet",
-        userMessage: { en: "I can't look at things yet. Tell me the price instead.", fi: "En osaa vielä katsoa asioita. Kerro hinta." } });
+    consents.requireForCapability(session.userRef, capabilityId); // fail closed (ARCHITECTURE.md §2.5)
+
+    // Attached captures reach the capability as Observations, or as media only if its manifest asks for it.
+    const observations: Observation[] = [];
+    const media: ContextCapture[] = [];
+    for (const id of intent.attached_capture_ids) {
+      const stored = captures.get(session.userRef, id);
+      if (!stored) {
+        if (captures.purgedUnderGrant(id)) throw new PlatformError("CONSENT_REVOKED", { capabilityId });
+        throw new PlatformError("VALIDATION_FAILED", { capabilityId, detail: `unknown or expired capture ${id}` });
+      }
+      consents.requireForCapture(session.userRef, stored.capture.consent_grant_id, stored.capture.purpose);
+      const decl = cap.manifest.capture_purposes.find((p) => p.purpose === stored.capture.purpose);
+      if (!decl) throw new PlatformError("VALIDATION_FAILED", { capabilityId, detail: `capability does not accept ${stored.capture.purpose}` });
+      if (decl.delivery === "observation" && stored.observation) observations.push(stored.observation);
+      else if (decl.delivery === "media" && captures.hasImage(id)) media.push(stored.capture);
+      else throw new PlatformError("CAPTURE_UNUSABLE", { capabilityId, detail: `capture ${id} has nothing to deliver` });
     }
 
     const request: DomainRequest = {
@@ -223,8 +325,8 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       user_ref: session.userRef,
       locale,
       utterance: intent.transcript?.text ?? null,
-      observations: [],
-      captures: [],
+      observations,
+      captures: media,
       conversation: { ref: session.conversationRef, recent_turns: intent.context.recent_turns },
       output_constraints: { speech_max_words: SPEECH_MAX_WORDS, discreet_mode: intent.output.discreet_mode, display: intent.output.display },
       device_capabilities: intent.device_capabilities,

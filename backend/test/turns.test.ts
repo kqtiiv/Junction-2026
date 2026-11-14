@@ -120,12 +120,12 @@ test("invalid VoiceIntent → 422 VALIDATION_FAILED", async () => {
   assert.ok(validate("error_envelope", res.json()).ok);
 });
 
-test("captures are refused until implemented, with a speakable message", async () => {
+test("no consent grant → CONSENT_REQUIRED, nothing answered (fail closed)", async () => {
   const { app } = makeApp();
-  const s = await newSession(app);
-  const res = await app.inject({ method: "POST", url: "/v1/turns", headers: auth,
-    payload: voiceIntent(s.session_id, "does this fit my week", { attached_capture_ids: ["cap_1"] }) });
+  const s = await newSession(app, "en-FI", { consent: false });
+  const res = await app.inject({ method: "POST", url: "/v1/turns", headers: auth, payload: voiceIntent(s.session_id, "what's safe to spend this week") });
   const events = parseSse(res.body);
-  assert.equal(events[0]?.event, "error");
-  assert.equal((events[0]?.data as { code: string }).code, "DEVICE_UNAVAILABLE");
+  assert.equal(events.length, 1);
+  assert.equal((events[0]!.data as { code: string }).code, "CONSENT_REQUIRED");
+  assert.ok(validate("error_envelope", events[0]!.data).ok);
 });

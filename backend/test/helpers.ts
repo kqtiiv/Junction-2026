@@ -26,11 +26,51 @@ export function makeApp(opts: { remote?: AgentBackend; deadlineMs?: number } = {
   return { app, engine, keys };
 }
 
-export async function newSession(app: FastifyInstance, locale = "en-FI"): Promise<{ session_id: string; conversation_ref: string }> {
+export async function grantConsent(app: FastifyInstance, purposes = ["price_label", "receipt"], headers = auth): Promise<string> {
+  const res = await app.inject({ method: "POST", url: "/v1/consents", headers,
+    payload: { capability_id: "sbank.coach", data_classes: ["financial_transactions", "observed_prices"], purposes } });
+  if (res.statusCode !== 201) throw new Error(`consent failed: ${res.body}`);
+  return res.json().consent_grant_id;
+}
+
+/** Creates a session and, unless `consent: false`, the combined consent grant the companion records at first launch. */
+export async function newSession(app: FastifyInstance, locale = "en-FI", opts: { consent?: boolean } = {}):
+  Promise<{ session_id: string; conversation_ref: string; consent_grant_id?: string }> {
   const res = await app.inject({ method: "POST", url: "/v1/sessions", headers: auth,
     payload: { mode: "glasses", device_capabilities: ["photo_capture", "camera_stream", "inputs"], locale } });
   if (res.statusCode !== 200) throw new Error(`session failed: ${res.body}`);
-  return res.json();
+  const session = res.json();
+  return opts.consent === false ? session : { ...session, consent_grant_id: await grantConsent(app) };
+}
+
+/** A minimal JPEG header (SOI, APP0, optional APP1/Exif, SOF0 with dimensions, EOI). Enough for inspection. */
+export function fakeJpeg(width = 1600, height = 1200, withExif = false): Buffer {
+  const seg = (marker: number, body: Buffer) => Buffer.concat([Buffer.from([0xff, marker]), Buffer.from([(body.length + 2) >> 8, (body.length + 2) & 0xff]), body]);
+  const app0 = seg(0xe0, Buffer.from("JFIF\0\x01\x01\0\0\x01\0\x01\0\0", "latin1"));
+  const app1 = seg(0xe1, Buffer.from("Exif\0\0MM\0*", "latin1"));
+  const sof = seg(0xc0, Buffer.from([8, height >> 8, height & 0xff, width >> 8, width & 0xff, 3, 1, 0x11, 0, 2, 0x11, 1, 3, 0x11, 1]));
+  return Buffer.concat([Buffer.from([0xff, 0xd8]), app0, ...(withExif ? [app1] : []), sof, Buffer.from([0xff, 0xd9])]);
+}
+
+export function captureMeta(sessionId: string, consentGrantId: string, over: Record<string, unknown> = {}) {
+  return {
+    session_id: sessionId, source: "glasses_photo", trigger: "voice_command", purpose: "price_label",
+    minimisation: ["orientation_applied", "exif_stripped", "gps_removed", "downscaled"],
+    consent_grant_id: consentGrantId, captured_at: new Date().toISOString(), locale: "fi-FI", ...over,
+  };
+}
+
+/** POST /v1/captures as multipart/form-data. */
+export async function uploadCapture(app: FastifyInstance, image: Buffer, meta: object, headers: Record<string, string> = auth) {
+  const boundary = "----test" + Math.random().toString(16).slice(2);
+  const body = Buffer.concat([
+    Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="meta"\r\n\r\n${JSON.stringify(meta)}\r\n`),
+    Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="image"; filename="c.jpg"\r\nContent-Type: image/jpeg\r\n\r\n`),
+    image,
+    Buffer.from(`\r\n--${boundary}--\r\n`),
+  ]);
+  return app.inject({ method: "POST", url: "/v1/captures", payload: body,
+    headers: { ...headers, "content-type": `multipart/form-data; boundary=${boundary}` } });
 }
 
 let turnCounter = 0;

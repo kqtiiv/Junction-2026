@@ -10,6 +10,8 @@ type DegradedTo = NonNullable<ErrorEnvelope["degraded_to"]>;
 const REGISTRY: Record<string, { status: number; retryable: boolean; message: LText }> = {
   UNAUTHENTICATED: { status: 401, retryable: false, message: { en: "Please sign in again.", fi: "Kirjaudu uudelleen." } },
   CONSENT_REQUIRED: { status: 403, retryable: false, message: { en: "I need your permission first. Check your phone.", fi: "Tarvitsen ensin luvan. Katso puhelinta." } },
+  CONSENT_REVOKED: { status: 403, retryable: false, message: { en: "That permission was withdrawn, so I've deleted what it covered.", fi: "Lupa peruttiin, joten poistin siihen liittyvät tiedot." } },
+  CAPTURE_UNUSABLE: { status: 422, retryable: false, message: { en: "I couldn't use that photo. Try again or use the phone camera.", fi: "En voinut käyttää kuvaa. Yritä uudelleen tai käytä puhelimen kameraa." } },
   VALIDATION_FAILED: { status: 422, retryable: false, message: { en: "Something went wrong with that request.", fi: "Pyynnössä oli virhe." } },
   CONTRACT_VERSION_UNSUPPORTED: { status: 422, retryable: false, message: { en: "This app needs an update.", fi: "Sovellus tarvitsee päivityksen." } },
   CAPABILITY_NOT_FOUND: { status: 404, retryable: false, message: { en: "I can't help with that yet.", fi: "En osaa vielä auttaa siinä." } },
