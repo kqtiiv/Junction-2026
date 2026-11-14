@@ -1,0 +1,120 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://contracts.example/v1/insight_card.schema.json",
+  "title": "InsightCard",
+  "description": "Schema-driven card rendered generically by the phone (and optionally the glasses display). Every value carries an epistemic label; calculated and estimated cards must cite calc_ids, observed cards must cite observations, educational cards must cite sources.",
+  "type": "object",
+  "required": ["schema", "card_id", "capability_id", "type", "title", "epistemic", "basis", "assumptions", "missing_data"],
+  "properties": {
+    "schema": { "const": "platform.insight_card/v1" },
+    "card_id": { "$ref": "common.schema.json#/definitions/Ref" },
+    "capability_id": { "$ref": "common.schema.json#/definitions/CapabilityId" },
+    "type": { "type": "string", "enum": ["metric", "breakdown", "comparison", "list", "explanation", "consent"] },
+    "title": { "$ref": "common.schema.json#/definitions/LText" },
+    "primary": { "$ref": "#/definitions/CardValue" },
+    "rows": {
+      "type": "array",
+      "maxItems": 12,
+      "items": { "$ref": "#/definitions/CardRow" }
+    },
+    "body": { "$ref": "common.schema.json#/definitions/LText" },
+    "epistemic": { "$ref": "common.schema.json#/definitions/Epistemic" },
+    "data_mode": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+    "basis": {
+      "title": "CardBasis",
+      "type": "object",
+      "required": ["calc_ids", "as_of"],
+      "properties": {
+        "calc_ids": { "type": "array", "items": { "$ref": "common.schema.json#/definitions/Ref" } },
+        "observation_ids": { "type": "array", "items": { "$ref": "common.schema.json#/definitions/Ref" } },
+        "as_of": { "$ref": "common.schema.json#/definitions/Timestamp" },
+        "sources": {
+          "type": "array",
+          "items": {
+            "title": "CardSource",
+            "type": "object",
+            "required": ["kind", "ref"],
+            "properties": {
+              "kind": { "type": "string", "enum": ["calculation", "observation", "document"] },
+              "ref": { "$ref": "common.schema.json#/definitions/Ref" },
+              "title": { "type": "string", "maxLength": 200 }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "assumptions": { "type": "array", "items": { "$ref": "common.schema.json#/definitions/LText" } },
+    "missing_data": { "type": "array", "items": { "$ref": "common.schema.json#/definitions/LText" } },
+    "proposal_ids": { "type": "array", "items": { "$ref": "common.schema.json#/definitions/Ref" } },
+    "render_hints": {
+      "title": "RenderHints",
+      "type": "object",
+      "properties": {
+        "glasses_display_lines": {
+          "type": "array",
+          "maxItems": 4,
+          "items": { "type": "string", "maxLength": 40 }
+        },
+        "voice_summary": { "$ref": "common.schema.json#/definitions/LText" },
+        "sensitive": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "definitions": {
+    "CardValue": {
+      "title": "CardValue",
+      "type": "object",
+      "required": ["label", "value", "epistemic"],
+      "properties": {
+        "label": { "$ref": "common.schema.json#/definitions/LText" },
+        "value": {
+          "anyOf": [
+            { "$ref": "common.schema.json#/definitions/Money" },
+            { "type": "string", "maxLength": 80 }
+          ]
+        },
+        "epistemic": { "$ref": "common.schema.json#/definitions/Epistemic" }
+      },
+      "additionalProperties": false
+    },
+    "CardRow": {
+      "title": "CardRow",
+      "type": "object",
+      "required": ["label", "value", "epistemic"],
+      "properties": {
+        "label": { "$ref": "common.schema.json#/definitions/LText" },
+        "value": {
+          "anyOf": [
+            { "$ref": "common.schema.json#/definitions/Money" },
+            { "type": "string", "maxLength": 80 }
+          ]
+        },
+        "epistemic": { "$ref": "common.schema.json#/definitions/Epistemic" },
+        "note": { "$ref": "common.schema.json#/definitions/LText" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "allOf": [
+    {
+      "$comment": "Calculated and estimated cards must cite at least one calc_id.",
+      "if": { "properties": { "epistemic": { "enum": ["calculated", "estimate"] } }, "required": ["epistemic"] },
+      "then": { "properties": { "basis": { "properties": { "calc_ids": { "minItems": 1 } } } } }
+    },
+    {
+      "$comment": "Observed cards must cite the observation they are based on.",
+      "if": { "properties": { "epistemic": { "const": "observed" } }, "required": ["epistemic"] },
+      "then": { "properties": { "basis": { "required": ["observation_ids"], "properties": { "observation_ids": { "minItems": 1 } } } } }
+    },
+    {
+      "$comment": "Educational cards must cite their sources.",
+      "if": { "properties": { "epistemic": { "const": "educational" } }, "required": ["epistemic"] },
+      "then": { "properties": { "basis": { "required": ["sources"], "properties": { "sources": { "minItems": 1 } } } } }
+    }
+  ],
+  "patternProperties": { "^x_": {} },
+  "additionalProperties": false
+}

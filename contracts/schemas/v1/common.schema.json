@@ -1,0 +1,197 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://contracts.example/v1/common.schema.json",
+  "title": "Common",
+  "description": "Shared primitives for every platform contract. Money is always a decimal string; never a JSON number.",
+  "definitions": {
+    "Ref": {
+      "title": "Ref",
+      "description": "Opaque, pseudonymous identifier. Never contains personal data.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:@-]*$"
+    },
+    "CapabilityId": {
+      "title": "CapabilityId",
+      "description": "Dotted capability id, e.g. 'sbank.coach', 'home.restock'.",
+      "type": "string",
+      "maxLength": 64,
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+    },
+    "IntentId": {
+      "title": "IntentId",
+      "description": "Dotted intent or event id with at least two segments, e.g. 'finance.safe_to_spend'.",
+      "type": "string",
+      "maxLength": 96,
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"
+    },
+    "ActionKind": {
+      "title": "ActionKind",
+      "description": "Kind of persistent action a capability may propose. Kinds that move money are forbidden on this platform: any segment equal to payment, transfer, purchase, credit or loan is rejected.",
+      "type": "string",
+      "maxLength": 96,
+      "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$",
+      "not": {
+        "type": "string",
+        "pattern": "(^|\\.)(payment|payments|transfer|transfers|purchase|purchases|credit|loan|loans)(\\.|$)"
+      }
+    },
+    "Timestamp": {
+      "title": "Timestamp",
+      "description": "RFC 3339 date-time with offset, e.g. 2026-11-19T17:52:04+02:00.",
+      "type": "string",
+      "format": "date-time"
+    },
+    "Date": {
+      "title": "Date",
+      "type": "string",
+      "format": "date"
+    },
+    "Locale": {
+      "title": "Locale",
+      "description": "BCP 47 language tag, language + optional region: fi, fi-FI, sv-FI, en-FI.",
+      "type": "string",
+      "pattern": "^[a-z]{2}(-[A-Z]{2})?$"
+    },
+    "DecimalString": {
+      "title": "DecimalString",
+      "description": "Exact decimal with two fraction digits and '.' separator. Localised formatting happens only in the UI.",
+      "type": "string",
+      "pattern": "^-?(0|[1-9][0-9]*)\\.[0-9]{2}$"
+    },
+    "Money": {
+      "title": "Money",
+      "type": "object",
+      "required": ["amount", "currency"],
+      "properties": {
+        "amount": { "$ref": "#/definitions/DecimalString" },
+        "currency": { "type": "string", "enum": ["EUR"] }
+      },
+      "additionalProperties": false
+    },
+    "Epistemic": {
+      "title": "Epistemic",
+      "description": "What kind of claim this is. fact = read from a record; calculated = deterministic from facts; estimate = deterministic but depends on assumptions or forecasts; educational = general content, not about the user's data; observed = perceived from a camera capture and may be misread.",
+      "type": "string",
+      "enum": ["fact", "calculated", "estimate", "educational", "observed"]
+    },
+    "LText": {
+      "title": "LText",
+      "description": "Localised text keyed by locale. At least one entry.",
+      "type": "object",
+      "minProperties": 1,
+      "patternProperties": {
+        "^[a-z]{2}(-[A-Z]{2})?$": { "type": "string", "minLength": 1, "maxLength": 2000 }
+      },
+      "additionalProperties": false
+    },
+    "Risk": {
+      "title": "Risk",
+      "type": "string",
+      "enum": ["low", "medium", "high"]
+    },
+    "ConfirmChannel": {
+      "title": "ConfirmChannel",
+      "description": "How a user may confirm a proposal. voice_readback and glasses_gesture are allowed only for low-risk, reversible actions after the summary has been read back.",
+      "type": "string",
+      "enum": ["phone_tap", "phone_biometric", "voice_readback", "glasses_gesture"]
+    },
+    "ConfirmationPolicyRules": {
+      "title": "ConfirmationPolicyRules",
+      "$comment": "Validation-only rules applied to any object with risk, reversible and confirm_channels. Stripped during code generation.",
+      "allOf": [
+        {
+          "$comment": "Hands-free confirmation (voice or gesture) only for low-risk, reversible actions.",
+          "if": {
+            "properties": { "confirm_channels": { "contains": { "enum": ["voice_readback", "glasses_gesture"] } } },
+            "required": ["confirm_channels"]
+          },
+          "then": { "properties": { "risk": { "const": "low" }, "reversible": { "const": true } } }
+        },
+        {
+          "$comment": "High-risk actions require biometric confirmation on the phone and nothing else.",
+          "if": { "properties": { "risk": { "const": "high" } }, "required": ["risk"] },
+          "then": { "properties": { "confirm_channels": { "items": { "const": "phone_biometric" } } } }
+        }
+      ]
+    },
+    "Confidence": {
+      "title": "Confidence",
+      "description": "Deterministic data-coverage confidence, not a model self-report.",
+      "type": "string",
+      "enum": ["high", "medium", "low"]
+    },
+    "Probability": {
+      "title": "Probability",
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "Sha256": {
+      "title": "Sha256",
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "MediaUri": {
+      "title": "MediaUri",
+      "description": "Reference to the platform's ephemeral media store. Never a public URL.",
+      "type": "string",
+      "format": "uri",
+      "pattern": "^media://"
+    },
+    "DeviceCapability": {
+      "title": "DeviceCapability",
+      "description": "Capabilities negotiated with the connected glasses at session start. Availability varies by device and SDK version.",
+      "type": "string",
+      "enum": ["voice_invocation", "on_device_speech", "photo_capture", "camera_stream", "audio_stream", "display", "inputs", "imu"]
+    },
+    "GlassesInput": {
+      "title": "GlassesInput",
+      "description": "Normalised glasses input. The companion maps device-specific events (touchpad, capture button, Neural Band) onto these.",
+      "type": "object",
+      "required": ["kind", "device_event_id"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["tap", "double_tap", "long_press", "swipe_forward", "swipe_back", "pinch", "capture_button"] },
+        "device_event_id": { "$ref": "#/definitions/Ref" }
+      },
+      "additionalProperties": false
+    },
+    "OutputDisplay": {
+      "title": "OutputDisplay",
+      "type": "string",
+      "enum": ["none", "glasses", "phone"]
+    },
+    "ConversationTurn": {
+      "title": "ConversationTurn",
+      "type": "object",
+      "required": ["role", "text"],
+      "properties": {
+        "role": { "type": "string", "enum": ["user", "assistant"] },
+        "text": { "type": "string", "maxLength": 1000 }
+      },
+      "additionalProperties": false
+    },
+    "MissingData": {
+      "title": "MissingData",
+      "type": "object",
+      "required": ["code"],
+      "properties": {
+        "code": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
+        "detail": { "type": "string", "maxLength": 300 }
+      },
+      "additionalProperties": false
+    },
+    "ErrorInfo": {
+      "title": "ErrorInfo",
+      "type": "object",
+      "required": ["code", "message", "retryable"],
+      "properties": {
+        "code": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
+        "message": { "type": "string", "maxLength": 500 },
+        "retryable": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

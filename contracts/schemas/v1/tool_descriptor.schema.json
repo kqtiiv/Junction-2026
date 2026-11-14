@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://contracts.example/v1/tool_descriptor.schema.json",
+  "title": "DeterministicTool",
+  "description": "Descriptor every domain publishes for its deterministic functions. The agent, the deterministic fast path and the verifier all use the same tools, so each tool can be tested without any model.",
+  "type": "object",
+  "required": ["schema", "name", "version", "owner", "deterministic", "side_effects", "description", "input_schema", "output_schema", "result_envelope", "golden_fixtures"],
+  "properties": {
+    "schema": { "const": "platform.tool_descriptor/v1" },
+    "name": { "type": "string", "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$" },
+    "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
+    "owner": { "$ref": "common.schema.json#/definitions/CapabilityId" },
+    "deterministic": { "const": true },
+    "side_effects": {
+      "description": "Tools never write persistent state directly. 'proposal_only' tools may create an ActionProposal.",
+      "type": "string",
+      "enum": ["none", "proposal_only"]
+    },
+    "description": { "type": "string", "minLength": 1, "maxLength": 1000 },
+    "input_schema": { "description": "JSON Schema for the tool input.", "type": "object" },
+    "output_schema": { "description": "JSON Schema for ToolResult.result.", "type": "object" },
+    "result_envelope": { "const": "platform.tool_result/v1" },
+    "golden_fixtures": { "type": "string", "minLength": 1 }
+  },
+  "patternProperties": { "^x_": {} },
+  "additionalProperties": false
+}

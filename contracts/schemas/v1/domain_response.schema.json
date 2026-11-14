@@ -1,0 +1,92 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://contracts.example/v1/domain_response.schema.json",
+  "title": "DomainResponse",
+  "description": "A capability's complete answer to one DomainRequest: one short spoken line, cards for the phone, optional proposals, and a trace. The agent sends trace.verified=false; only the adapter sets it to true after checking every number against the engine.",
+  "type": "object",
+  "required": ["schema", "request_id", "status", "speech", "cards", "proposals", "trace"],
+  "properties": {
+    "schema": { "const": "platform.domain_response/v1" },
+    "request_id": { "$ref": "common.schema.json#/definitions/Ref" },
+    "status": { "type": "string", "enum": ["answered", "partial", "clarify", "unsupported", "error"] },
+    "speech": {
+      "title": "SpokenLine",
+      "type": "object",
+      "required": ["text", "epistemic"],
+      "properties": {
+        "text": { "type": "string", "minLength": 1, "maxLength": 400 },
+        "epistemic": { "$ref": "common.schema.json#/definitions/Epistemic" }
+      },
+      "additionalProperties": false
+    },
+    "cards": { "type": "array", "maxItems": 6, "items": { "$ref": "insight_card.schema.json" } },
+    "proposals": { "type": "array", "maxItems": 3, "items": { "$ref": "action_proposal.schema.json" } },
+    "followups": {
+      "description": "Suggested follow-up questions shown as chips.",
+      "type": "array",
+      "maxItems": 3,
+      "items": { "$ref": "common.schema.json#/definitions/LText" }
+    },
+    "trace": {
+      "title": "ResponseTrace",
+      "type": "object",
+      "required": ["calc_ids", "tools", "backend", "verified"],
+      "properties": {
+        "calc_ids": { "type": "array", "items": { "$ref": "common.schema.json#/definitions/Ref" } },
+        "observation_ids": { "type": "array", "items": { "$ref": "common.schema.json#/definitions/Ref" } },
+        "tools": {
+          "type": "array",
+          "items": {
+            "title": "ToolCallTrace",
+            "type": "object",
+            "required": ["name", "ok", "ms"],
+            "properties": {
+              "name": { "type": "string", "maxLength": 96 },
+              "ok": { "type": "boolean" },
+              "ms": { "type": "integer", "minimum": 0 }
+            },
+            "additionalProperties": false
+          }
+        },
+        "backend": {
+          "description": "Opaque backend id for telemetry only, e.g. 'remote_agent@0.4', 'fast_path@1'. The platform never branches on it.",
+          "type": "string",
+          "maxLength": 64
+        },
+        "verified": { "type": "boolean" },
+        "verification": {
+          "title": "VerificationReport",
+          "type": "object",
+          "required": ["checked_values", "unverified"],
+          "properties": {
+            "checked_values": { "type": "integer", "minimum": 0 },
+            "unverified": { "type": "array", "items": { "type": "string", "maxLength": 64 } }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "error": { "$ref": "common.schema.json#/definitions/ErrorInfo" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "error" } }, "required": ["status"] },
+      "then": { "required": ["error"] }
+    },
+    {
+      "$comment": "A verified response must include its verification report, with no unverified values.",
+      "if": { "properties": { "trace": { "properties": { "verified": { "const": true } } } } },
+      "then": {
+        "properties": {
+          "trace": {
+            "required": ["verification"],
+            "properties": { "verification": { "properties": { "unverified": { "maxItems": 0 } } } }
+          }
+        }
+      }
+    }
+  ],
+  "patternProperties": { "^x_": {} },
+  "additionalProperties": false
+}

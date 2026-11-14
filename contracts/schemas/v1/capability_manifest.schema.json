@@ -1,0 +1,120 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://contracts.example/v1/capability_manifest.schema.json",
+  "title": "DomainCapability",
+  "description": "What a capability declares to the platform. The platform loads nothing it cannot validate: intents, capture purposes, data classes (for consent), action kinds (for confirmation policy), events, transport and SLOs.",
+  "type": "object",
+  "required": ["schema", "capability_id", "version", "contract_version", "display_name", "intents", "capture_purposes", "data_classes", "action_kinds", "events_emitted", "transport", "slo", "fixtures_uri"],
+  "properties": {
+    "schema": { "const": "platform.capability_manifest/v1" },
+    "capability_id": { "$ref": "common.schema.json#/definitions/CapabilityId" },
+    "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+([-+][0-9A-Za-z.-]+)?$" },
+    "contract_version": { "const": "1" },
+    "display_name": { "$ref": "common.schema.json#/definitions/LText" },
+    "intents": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "title": "IntentDeclaration",
+        "type": "object",
+        "required": ["id", "voice_ok", "accepts_capture", "examples"],
+        "properties": {
+          "id": { "$ref": "common.schema.json#/definitions/IntentId" },
+          "voice_ok": { "type": "boolean" },
+          "accepts_capture": {
+            "description": "Capture purposes this intent can use; each must appear in capture_purposes.",
+            "type": "array",
+            "uniqueItems": true,
+            "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" }
+          },
+          "examples": {
+            "type": "array",
+            "items": { "$ref": "common.schema.json#/definitions/LText" }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "capture_purposes": {
+      "type": "array",
+      "items": {
+        "title": "CapturePurpose",
+        "type": "object",
+        "required": ["purpose", "delivery", "retention_max_s"],
+        "properties": {
+          "purpose": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+          "delivery": {
+            "description": "'observation' (default, preferred): the capability receives only what the platform read. 'media': it receives the minimised image via a short-lived reference.",
+            "type": "string",
+            "enum": ["observation", "media"]
+          },
+          "retention_max_s": {
+            "description": "Maximum time the capability may keep the image. Capped at 30 days.",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2592000
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "data_classes": {
+      "description": "Data classes this capability touches; the consent registry asks for each.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" }
+    },
+    "action_kinds": {
+      "type": "array",
+      "items": {
+        "title": "ActionKindDeclaration",
+        "type": "object",
+        "required": ["kind", "risk", "reversible", "confirm_channels"],
+        "properties": {
+          "kind": { "$ref": "common.schema.json#/definitions/ActionKind" },
+          "risk": { "$ref": "common.schema.json#/definitions/Risk" },
+          "reversible": { "type": "boolean" },
+          "confirm_channels": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "$ref": "common.schema.json#/definitions/ConfirmChannel" }
+          }
+        },
+        "allOf": [{ "$ref": "common.schema.json#/definitions/ConfirmationPolicyRules" }],
+        "additionalProperties": false
+      }
+    },
+    "events_emitted": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/definitions/IntentId" }
+    },
+    "transport": {
+      "title": "CapabilityTransport",
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": { "type": "string", "enum": ["https_sse", "https_json", "in_process"] },
+        "endpoint": { "type": "string", "format": "uri" }
+      },
+      "if": { "properties": { "kind": { "enum": ["https_sse", "https_json"] } } },
+      "then": { "required": ["endpoint"] },
+      "additionalProperties": false
+    },
+    "slo": {
+      "title": "LatencySlo",
+      "type": "object",
+      "required": ["p50_ms", "p95_ms"],
+      "properties": {
+        "p50_ms": { "type": "integer", "minimum": 1 },
+        "p95_ms": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "fixtures_uri": { "type": "string", "minLength": 1 },
+    "health_uri": { "type": "string", "format": "uri" }
+  },
+  "patternProperties": { "^x_": {} },
+  "additionalProperties": false
+}

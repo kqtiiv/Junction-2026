@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://contracts.example/v1/context_capture.schema.json",
+  "title": "ContextCapture",
+  "description": "A user-initiated photo from the glasses or phone, minimised on the phone before upload. Capabilities receive raw media only if their manifest declares delivery 'media' for this purpose; otherwise they receive Observations.",
+  "type": "object",
+  "required": ["schema", "capture_id", "session_id", "user_ref", "source", "trigger", "purpose", "media", "minimisation", "consent_grant_id", "captured_at", "locale"],
+  "properties": {
+    "schema": { "const": "platform.context_capture/v1" },
+    "capture_id": { "$ref": "common.schema.json#/definitions/Ref" },
+    "session_id": { "$ref": "common.schema.json#/definitions/Ref" },
+    "user_ref": { "$ref": "common.schema.json#/definitions/Ref" },
+    "source": { "type": "string", "enum": ["glasses_photo", "glasses_stream_frame", "phone_camera", "phone_upload"] },
+    "trigger": { "type": "string", "enum": ["voice_command", "glasses_input", "phone_tap"] },
+    "purpose": {
+      "description": "A purpose declared in some capability manifest's capture_purposes, e.g. 'price_label', 'receipt'.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "media": {
+      "title": "CaptureMedia",
+      "type": "object",
+      "required": ["kind", "mime", "width", "height", "sha256", "uri", "expires_at"],
+      "properties": {
+        "kind": { "const": "image" },
+        "mime": { "type": "string", "enum": ["image/jpeg", "image/png"] },
+        "width": { "type": "integer", "minimum": 1, "maximum": 4096 },
+        "height": { "type": "integer", "minimum": 1, "maximum": 4096 },
+        "sha256": { "$ref": "common.schema.json#/definitions/Sha256" },
+        "uri": { "$ref": "common.schema.json#/definitions/MediaUri" },
+        "expires_at": { "$ref": "common.schema.json#/definitions/Timestamp" }
+      },
+      "additionalProperties": false
+    },
+    "minimisation": {
+      "description": "What the phone did before upload. EXIF stripping is mandatory.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "enum": ["exif_stripped", "gps_removed", "downscaled", "cropped", "faces_blurred"] },
+      "contains": { "const": "exif_stripped" }
+    },
+    "consent_grant_id": { "$ref": "common.schema.json#/definitions/Ref" },
+    "captured_at": { "$ref": "common.schema.json#/definitions/Timestamp" },
+    "locale": { "$ref": "common.schema.json#/definitions/Locale" }
+  },
+  "patternProperties": { "^x_": {} },
+  "additionalProperties": false
+}

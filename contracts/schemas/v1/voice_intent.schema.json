@@ -1,0 +1,95 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://contracts.example/v1/voice_intent.schema.json",
+  "title": "VoiceIntent",
+  "description": "One user turn from the companion: an utterance (transcribed on the phone) and/or a glasses input. The platform only recognises platform intents (confirm, cancel, ...); domain intent recognition belongs to the capability.",
+  "type": "object",
+  "required": ["schema", "turn_id", "session_id", "user_ref", "invocation", "platform_intent", "capability_hint", "attached_capture_ids", "context", "output", "device_capabilities"],
+  "properties": {
+    "schema": { "const": "platform.voice_intent/v1" },
+    "turn_id": { "$ref": "common.schema.json#/definitions/Ref" },
+    "session_id": { "$ref": "common.schema.json#/definitions/Ref" },
+    "user_ref": { "$ref": "common.schema.json#/definitions/Ref" },
+    "invocation": { "type": "string", "enum": ["hey_meta", "glasses_input", "phone_push_to_talk", "typed"] },
+    "transcript": {
+      "title": "Transcript",
+      "type": "object",
+      "required": ["text", "lang"],
+      "properties": {
+        "text": { "type": "string", "minLength": 1, "maxLength": 1000 },
+        "lang": { "$ref": "common.schema.json#/definitions/Locale" },
+        "confidence": { "$ref": "common.schema.json#/definitions/Probability" },
+        "asr_provider": { "$ref": "common.schema.json#/definitions/Ref" }
+      },
+      "additionalProperties": false
+    },
+    "input": { "$ref": "common.schema.json#/definitions/GlassesInput" },
+    "platform_intent": {
+      "enum": [null, "confirm", "reject", "cancel", "repeat", "show_on_phone", "next_card", "stop"]
+    },
+    "capability_hint": {
+      "anyOf": [{ "$ref": "common.schema.json#/definitions/CapabilityId" }, { "type": "null" }]
+    },
+    "attached_capture_ids": {
+      "type": "array",
+      "maxItems": 4,
+      "items": { "$ref": "common.schema.json#/definitions/Ref" }
+    },
+    "context": {
+      "title": "TurnContext",
+      "type": "object",
+      "required": ["active_capability", "pending_proposal_id", "conversation_ref", "recent_turns"],
+      "properties": {
+        "active_capability": { "anyOf": [{ "$ref": "common.schema.json#/definitions/CapabilityId" }, { "type": "null" }] },
+        "pending_proposal_id": { "anyOf": [{ "$ref": "common.schema.json#/definitions/Ref" }, { "type": "null" }] },
+        "conversation_ref": { "$ref": "common.schema.json#/definitions/Ref" },
+        "recent_turns": {
+          "type": "array",
+          "maxItems": 10,
+          "items": { "$ref": "common.schema.json#/definitions/ConversationTurn" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "output": {
+      "title": "OutputPreferences",
+      "type": "object",
+      "required": ["speech", "display", "discreet_mode"],
+      "properties": {
+        "speech": { "type": "boolean" },
+        "display": { "$ref": "common.schema.json#/definitions/OutputDisplay" },
+        "discreet_mode": {
+          "description": "When true, spoken output must not contain amounts; details go to the phone.",
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "device_capabilities": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/definitions/DeviceCapability" }
+    }
+  },
+  "allOf": [
+    {
+      "$comment": "Spoken or typed turns must carry a transcript.",
+      "if": { "properties": { "invocation": { "enum": ["hey_meta", "phone_push_to_talk", "typed"] } }, "required": ["invocation"] },
+      "then": { "required": ["transcript"] }
+    },
+    {
+      "$comment": "Gesture-only turns must carry the input and must map to a platform intent.",
+      "if": {
+        "properties": { "invocation": { "const": "glasses_input" } },
+        "required": ["invocation"],
+        "not": { "required": ["transcript"] }
+      },
+      "then": {
+        "required": ["input"],
+        "properties": { "platform_intent": { "enum": ["confirm", "reject", "cancel", "repeat", "show_on_phone", "next_card", "stop"] } }
+      }
+    }
+  ],
+  "patternProperties": { "^x_": {} },
+  "additionalProperties": false
+}

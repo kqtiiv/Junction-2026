@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://contracts.example/v1/user_confirmation.schema.json",
+  "title": "UserConfirmation",
+  "description": "Created only by the companion from a real user input, then signed by the platform (L3). Capabilities verify the signature and that payload_hash matches the payload they hold before applying anything. Capabilities can never create one.",
+  "type": "object",
+  "required": ["schema", "confirmation_id", "proposal_id", "payload_hash", "decision", "channel", "evidence", "user_ref", "session_id", "confirmed_at", "signature"],
+  "properties": {
+    "schema": { "const": "platform.user_confirmation/v1" },
+    "confirmation_id": { "$ref": "common.schema.json#/definitions/Ref" },
+    "proposal_id": { "$ref": "common.schema.json#/definitions/Ref" },
+    "payload_hash": { "$ref": "common.schema.json#/definitions/Sha256" },
+    "decision": { "type": "string", "enum": ["confirm", "reject"] },
+    "channel": { "$ref": "common.schema.json#/definitions/ConfirmChannel" },
+    "evidence": {
+      "title": "ConfirmationEvidence",
+      "type": "object",
+      "properties": {
+        "readback_played": { "type": "boolean" },
+        "utterance": { "type": "string", "maxLength": 200 },
+        "asr_confidence": { "$ref": "common.schema.json#/definitions/Probability" },
+        "input": { "$ref": "common.schema.json#/definitions/GlassesInput" },
+        "ui_event_id": { "$ref": "common.schema.json#/definitions/Ref" }
+      },
+      "additionalProperties": false
+    },
+    "user_ref": { "$ref": "common.schema.json#/definitions/Ref" },
+    "session_id": { "$ref": "common.schema.json#/definitions/Ref" },
+    "confirmed_at": { "$ref": "common.schema.json#/definitions/Timestamp" },
+    "signature": {
+      "description": "Compact JWS over the other fields, signed by the platform key.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$"
+    }
+  },
+  "allOf": [
+    {
+      "$comment": "Voice confirmation: summary was read back, exact grammar matched, ASR confidence >= 0.85.",
+      "if": { "properties": { "channel": { "const": "voice_readback" } }, "required": ["channel"] },
+      "then": {
+        "properties": {
+          "evidence": {
+            "required": ["readback_played", "utterance", "asr_confidence"],
+            "properties": {
+              "readback_played": { "const": true },
+              "asr_confidence": { "minimum": 0.85 }
+            }
+          }
+        }
+      }
+    },
+    {
+      "$comment": "Gesture confirmation: summary was read back and the glasses input is recorded.",
+      "if": { "properties": { "channel": { "const": "glasses_gesture" } }, "required": ["channel"] },
+      "then": {
+        "properties": {
+          "evidence": {
+            "required": ["readback_played", "input"],
+            "properties": { "readback_played": { "const": true } }
+          }
+        }
+      }
+    },
+    {
+      "$comment": "Phone confirmation: the UI event is recorded.",
+      "if": { "properties": { "channel": { "enum": ["phone_tap", "phone_biometric"] } }, "required": ["channel"] },
+      "then": { "properties": { "evidence": { "required": ["ui_event_id"] } } }
+    }
+  ],
+  "patternProperties": { "^x_": {} },
+  "additionalProperties": false
+}

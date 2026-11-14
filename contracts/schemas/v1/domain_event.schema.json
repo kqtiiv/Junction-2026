@@ -1,0 +1,92 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://contracts.example/v1/domain_event.schema.json",
+  "title": "DomainEvent",
+  "description": "Emitted by a capability for possible proactive delivery. The platform's notification policy decides whether, when and where to deliver it (rate limits, quiet hours, active session). Amounts are never spoken proactively: open-ear speakers can be overheard. The summary must be safe to show on a lock screen: no amounts, merchants or item names.",
+  "type": "object",
+  "required": [
+    "schema",
+    "event_id",
+    "capability_id",
+    "type",
+    "user_ref",
+    "occurred_at",
+    "expires_at",
+    "dedupe_key",
+    "severity",
+    "summary",
+    "delivery_prefs"
+  ],
+  "properties": {
+    "schema": {
+      "const": "platform.domain_event/v1"
+    },
+    "event_id": {
+      "$ref": "common.schema.json#/definitions/Ref"
+    },
+    "capability_id": {
+      "$ref": "common.schema.json#/definitions/CapabilityId"
+    },
+    "type": {
+      "$ref": "common.schema.json#/definitions/IntentId"
+    },
+    "user_ref": {
+      "$ref": "common.schema.json#/definitions/Ref"
+    },
+    "occurred_at": {
+      "$ref": "common.schema.json#/definitions/Timestamp"
+    },
+    "expires_at": {
+      "$ref": "common.schema.json#/definitions/Timestamp"
+    },
+    "dedupe_key": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "info",
+        "nudge",
+        "important"
+      ]
+    },
+    "summary": {
+      "$ref": "common.schema.json#/definitions/LText"
+    },
+    "card_ref": {
+      "$ref": "common.schema.json#/definitions/Ref"
+    },
+    "delivery_prefs": {
+      "title": "DeliveryPrefs",
+      "type": "object",
+      "required": [
+        "phone_notification",
+        "glasses_audio",
+        "spoken_amounts"
+      ],
+      "properties": {
+        "phone_notification": {
+          "type": "boolean"
+        },
+        "glasses_audio": {
+          "type": "string",
+          "enum": [
+            "never",
+            "in_session_only"
+          ]
+        },
+        "spoken_amounts": {
+          "description": "Reserved. Always false in v1.",
+          "const": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "patternProperties": {
+    "^x_": {}
+  },
+  "additionalProperties": false
+}

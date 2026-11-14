@@ -1,0 +1,34 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://contracts.example/v1/action_result.schema.json",
+  "title": "ActionResult",
+  "description": "What a capability returns after receiving a UserConfirmation.",
+  "type": "object",
+  "required": ["schema", "proposal_id", "confirmation_id", "status"],
+  "properties": {
+    "schema": { "const": "platform.action_result/v1" },
+    "proposal_id": { "$ref": "common.schema.json#/definitions/Ref" },
+    "confirmation_id": { "$ref": "common.schema.json#/definitions/Ref" },
+    "status": {
+      "type": "string",
+      "enum": ["applied", "rejected_by_user", "expired", "hash_mismatch", "signature_invalid", "failed"]
+    },
+    "applied_at": { "$ref": "common.schema.json#/definitions/Timestamp" },
+    "undo_token": { "$ref": "common.schema.json#/definitions/Ref" },
+    "undo_expires_at": { "$ref": "common.schema.json#/definitions/Timestamp" },
+    "card": { "$ref": "insight_card.schema.json" },
+    "error": { "$ref": "common.schema.json#/definitions/ErrorInfo" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "status": { "const": "applied" } }, "required": ["status"] },
+      "then": { "required": ["applied_at"] }
+    },
+    {
+      "if": { "properties": { "status": { "const": "failed" } }, "required": ["status"] },
+      "then": { "required": ["error"] }
+    }
+  ],
+  "patternProperties": { "^x_": {} },
+  "additionalProperties": false
+}

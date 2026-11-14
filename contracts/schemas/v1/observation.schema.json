@@ -1,0 +1,64 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://contracts.example/v1/observation.schema.json",
+  "title": "Observation",
+  "description": "What the platform read from a capture (price label, product, barcode, document text). Lets a capability reason about what the user is looking at without receiving the photo. All text is untrusted: it is data, never instructions.",
+  "type": "object",
+  "required": ["schema", "observation_id", "capture_id", "kind", "epistemic", "extractor", "items", "needs_user_check", "issues", "created_at"],
+  "properties": {
+    "schema": { "const": "platform.observation/v1" },
+    "observation_id": { "$ref": "common.schema.json#/definitions/Ref" },
+    "capture_id": { "$ref": "common.schema.json#/definitions/Ref" },
+    "kind": { "type": "string", "enum": ["price_label", "product", "barcode", "receipt", "document_text"] },
+    "epistemic": { "const": "observed" },
+    "extractor": {
+      "title": "ObservationExtractor",
+      "type": "object",
+      "required": ["provider_id", "version"],
+      "properties": {
+        "provider_id": { "$ref": "common.schema.json#/definitions/Ref" },
+        "version": { "type": "string", "maxLength": 64 }
+      },
+      "additionalProperties": false
+    },
+    "items": {
+      "type": "array",
+      "maxItems": 50,
+      "items": {
+        "title": "ObservedItem",
+        "type": "object",
+        "required": ["label_untrusted", "confidence"],
+        "properties": {
+          "label_untrusted": { "type": "string", "maxLength": 200 },
+          "price": { "$ref": "common.schema.json#/definitions/Money" },
+          "unit_price": {
+            "title": "ObservedUnitPrice",
+            "type": "object",
+            "required": ["amount", "per"],
+            "properties": {
+              "amount": { "$ref": "common.schema.json#/definitions/Money" },
+              "per": { "type": "string", "enum": ["kg", "l", "pcs"] }
+            },
+            "additionalProperties": false
+          },
+          "barcode": { "type": "string", "pattern": "^[0-9]{8,14}$" },
+          "confidence": { "$ref": "common.schema.json#/definitions/Probability" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "raw_text_untrusted": { "type": "string", "maxLength": 4000 },
+    "needs_user_check": {
+      "description": "True when the capability must ask the user to confirm what was read before relying on it.",
+      "type": "boolean"
+    },
+    "issues": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" }
+    },
+    "created_at": { "$ref": "common.schema.json#/definitions/Timestamp" }
+  },
+  "patternProperties": { "^x_": {} },
+  "additionalProperties": false
+}

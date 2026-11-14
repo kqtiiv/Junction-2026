@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://contracts.example/v1/tool_result.schema.json",
+  "title": "ToolResult",
+  "description": "Envelope every deterministic tool returns. A successful non-educational result must carry a resolvable calc_id so the adapter can verify every number shown or spoken.",
+  "type": "object",
+  "required": ["schema", "ok", "tool", "tool_version", "as_of", "assumptions", "missing_data", "warnings"],
+  "properties": {
+    "schema": { "const": "platform.tool_result/v1" },
+    "ok": { "type": "boolean" },
+    "calc_id": { "anyOf": [{ "$ref": "common.schema.json#/definitions/Ref" }, { "type": "null" }] },
+    "tool": { "type": "string", "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$" },
+    "tool_version": { "type": "string", "maxLength": 32 },
+    "epistemic": { "$ref": "common.schema.json#/definitions/Epistemic" },
+    "data_mode": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+    "as_of": { "$ref": "common.schema.json#/definitions/Timestamp" },
+    "result": {
+      "description": "Tool-specific payload. Domains publish its schema in the tool descriptor (and may tighten it in a domain overlay).",
+      "type": "object"
+    },
+    "assumptions": { "type": "array", "items": { "type": "string", "maxLength": 300 } },
+    "missing_data": { "type": "array", "items": { "$ref": "common.schema.json#/definitions/MissingData" } },
+    "warnings": { "type": "array", "items": { "type": "string", "maxLength": 300 } },
+    "confidence": { "$ref": "common.schema.json#/definitions/Confidence" },
+    "error": { "$ref": "common.schema.json#/definitions/ErrorInfo" }
+  },
+  "allOf": [
+    {
+      "$comment": "Success needs a result and an epistemic label.",
+      "if": { "properties": { "ok": { "const": true } }, "required": ["ok"] },
+      "then": { "required": ["result", "epistemic", "calc_id"], "not": { "required": ["error"] } }
+    },
+    {
+      "$comment": "Failure needs an error and no result.",
+      "if": { "properties": { "ok": { "const": false } }, "required": ["ok"] },
+      "then": { "required": ["error"], "not": { "required": ["result"] } }
+    },
+    {
+      "$comment": "Successful results about the user's data must be traceable.",
+      "if": {
+        "properties": { "ok": { "const": true }, "epistemic": { "enum": ["fact", "calculated", "estimate", "observed"] } },
+        "required": ["ok", "epistemic"]
+      },
+      "then": { "properties": { "calc_id": { "$ref": "common.schema.json#/definitions/Ref" } } }
+    }
+  ],
+  "patternProperties": { "^x_": {} },
+  "additionalProperties": false
+}

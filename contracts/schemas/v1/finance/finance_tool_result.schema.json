@@ -1,0 +1,39 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://contracts.example/v1/finance/finance_tool_result.schema.json",
+  "title": "FinanceToolResult",
+  "description": "platform.tool_result/v1 as returned by S-Bank Coach tools, with finance rules: known tool names, data_mode on estimates, finance missing-data codes, typed results for safe-to-spend and affordability, and no yes/no affordability in pace mode.",
+  "allOf": [
+    { "$ref": "../tool_result.schema.json" },
+    {
+      "properties": {
+        "tool": { "$ref": "finance.schema.json#/definitions/FinanceToolName" },
+        "data_mode": { "$ref": "finance.schema.json#/definitions/DataMode" },
+        "missing_data": {
+          "items": { "properties": { "code": { "$ref": "finance.schema.json#/definitions/MissingDataCode" } } }
+        }
+      }
+    },
+    {
+      "$comment": "Estimates must say which data mode produced them.",
+      "if": { "properties": { "ok": { "const": true }, "epistemic": { "const": "estimate" } }, "required": ["ok", "epistemic"] },
+      "then": { "required": ["data_mode"] }
+    },
+    {
+      "if": { "properties": { "ok": { "const": true }, "tool": { "const": "finance.get_safe_to_spend" } }, "required": ["ok", "tool"] },
+      "then": { "properties": { "result": { "$ref": "finance.schema.json#/definitions/SafeToSpendResult" } } }
+    },
+    {
+      "if": { "properties": { "ok": { "const": true }, "tool": { "const": "finance.calculate_affordability" } }, "required": ["ok", "tool"] },
+      "then": { "properties": { "result": { "$ref": "finance.schema.json#/definitions/AffordabilityResult" } } }
+    },
+    {
+      "$comment": "Pace mode cannot answer affordability with yes/no.",
+      "if": {
+        "properties": { "ok": { "const": true }, "tool": { "const": "finance.calculate_affordability" }, "data_mode": { "const": "pace" } },
+        "required": ["ok", "tool", "data_mode"]
+      },
+      "then": { "properties": { "result": { "properties": { "verdict": { "const": "UNKNOWN" } } } } }
+    }
+  ]
+}

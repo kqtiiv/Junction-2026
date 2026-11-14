@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://contracts.example/v1/domain_response_event.schema.json",
+  "title": "DomainResponseEvent",
+  "description": "One event in a streamed answer (SSE). Exactly one 'final' event ends the stream; cards and proposals in earlier events are repeated in the final response so non-streaming consumers lose nothing.",
+  "oneOf": [
+    { "$ref": "#/definitions/ProgressEvent" },
+    { "$ref": "#/definitions/CardEvent" },
+    { "$ref": "#/definitions/ProposalEvent" },
+    { "$ref": "#/definitions/FinalEvent" }
+  ],
+  "definitions": {
+    "ProgressEvent": {
+      "title": "ProgressEvent",
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": { "const": "progress" },
+        "stage": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "speech_hint": { "$ref": "common.schema.json#/definitions/LText" }
+      },
+      "additionalProperties": false
+    },
+    "CardEvent": {
+      "title": "CardEvent",
+      "type": "object",
+      "required": ["type", "card"],
+      "properties": {
+        "type": { "const": "card" },
+        "card": { "$ref": "insight_card.schema.json" }
+      },
+      "additionalProperties": false
+    },
+    "ProposalEvent": {
+      "title": "ProposalEvent",
+      "type": "object",
+      "required": ["type", "proposal"],
+      "properties": {
+        "type": { "const": "proposal" },
+        "proposal": { "$ref": "action_proposal.schema.json" }
+      },
+      "additionalProperties": false
+    },
+    "FinalEvent": {
+      "title": "FinalEvent",
+      "type": "object",
+      "required": ["type", "response"],
+      "properties": {
+        "type": { "const": "final" },
+        "response": { "$ref": "domain_response.schema.json" }
+      },
+      "additionalProperties": false
+    }
+  }
+}

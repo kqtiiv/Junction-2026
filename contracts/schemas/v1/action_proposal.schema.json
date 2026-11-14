@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://contracts.example/v1/action_proposal.schema.json",
+  "title": "ActionProposal",
+  "description": "A persistent change a capability proposes. The capability keeps the payload; the platform keeps only its hash and owns the confirmation. Nothing is applied without a signed UserConfirmation.",
+  "type": "object",
+  "required": ["schema", "proposal_id", "capability_id", "kind", "summary", "details", "payload_hash", "risk", "reversible", "confirm_channels", "expires_at"],
+  "properties": {
+    "schema": { "const": "platform.action_proposal/v1" },
+    "proposal_id": { "$ref": "common.schema.json#/definitions/Ref" },
+    "capability_id": { "$ref": "common.schema.json#/definitions/CapabilityId" },
+    "kind": { "$ref": "common.schema.json#/definitions/ActionKind" },
+    "summary": {
+      "title": "ProposalSummary",
+      "type": "object",
+      "required": ["spoken", "text"],
+      "properties": {
+        "spoken": { "$ref": "common.schema.json#/definitions/LText" },
+        "text": { "$ref": "common.schema.json#/definitions/LText" }
+      },
+      "additionalProperties": false
+    },
+    "details": {
+      "type": "array",
+      "maxItems": 6,
+      "items": {
+        "title": "ProposalDetail",
+        "type": "object",
+        "required": ["label", "after"],
+        "properties": {
+          "label": { "$ref": "common.schema.json#/definitions/LText" },
+          "before": { "type": "string", "maxLength": 120 },
+          "after": { "type": "string", "maxLength": 120 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "payload_hash": { "$ref": "common.schema.json#/definitions/Sha256" },
+    "risk": { "$ref": "common.schema.json#/definitions/Risk" },
+    "reversible": { "type": "boolean" },
+    "undo_window_s": { "type": "integer", "minimum": 0 },
+    "confirm_channels": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/definitions/ConfirmChannel" }
+    },
+    "expires_at": { "$ref": "common.schema.json#/definitions/Timestamp" }
+  },
+  "allOf": [{ "$ref": "common.schema.json#/definitions/ConfirmationPolicyRules" }],
+  "patternProperties": { "^x_": {} },
+  "additionalProperties": false
+}

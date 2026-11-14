@@ -1,0 +1,202 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://contracts.example/v1/finance/finance.schema.json",
+  "title": "Finance",
+  "description": "Finance-domain vocabulary for the S-Bank Coach capability. Owned jointly by the platform and the Coach team; tightens the platform contracts without changing them.",
+  "definitions": {
+    "DataMode": {
+      "title": "DataMode",
+      "description": "balance = actual balance + income date; budget = detected income and bills, no balance; pace = spending history only (no affordability yes/no allowed).",
+      "type": "string",
+      "enum": [
+        "balance",
+        "budget",
+        "pace"
+      ]
+    },
+    "MissingDataCode": {
+      "title": "MissingDataCode",
+      "type": "string",
+      "enum": [
+        "NO_BALANCE",
+        "BALANCE_STALE",
+        "INCOME_NOT_DETECTED",
+        "HISTORY_LT_4_WEEKS",
+        "COMMITMENT_ESTIMATED",
+        "RECEIPT_UNMATCHED",
+        "PRICE_UNCERTAIN"
+      ]
+    },
+    "FinanceIntent": {
+      "title": "FinanceIntent",
+      "type": "string",
+      "enum": [
+        "finance.spend.query",
+        "finance.spender_profile",
+        "finance.safe_to_spend",
+        "finance.simulate_change",
+        "finance.basket.affordability",
+        "finance.commitments.upcoming",
+        "finance.goal.projection",
+        "finance.receipt.scan",
+        "finance.classification.correct",
+        "finance.explain",
+        "finance.education"
+      ]
+    },
+    "FinanceActionKind": {
+      "title": "FinanceActionKind",
+      "type": "string",
+      "enum": [
+        "finance.plan.add",
+        "finance.classification.update",
+        "finance.receipt.link",
+        "finance.settings.buffer.update",
+        "finance.goal.update",
+        "finance.data.delete"
+      ]
+    },
+    "FinanceToolName": {
+      "title": "FinanceToolName",
+      "type": "string",
+      "enum": [
+        "finance.get_spending_summary",
+        "finance.get_transactions",
+        "finance.get_basket_breakdown",
+        "finance.get_safe_to_spend",
+        "finance.get_upcoming_commitments",
+        "finance.simulate_spending_change",
+        "finance.get_savings_projection",
+        "finance.calculate_affordability",
+        "finance.process_receipt",
+        "finance.propose_classification_change",
+        "finance.get_calculation"
+      ]
+    },
+    "SafeToSpendResult": {
+      "title": "SafeToSpendResult",
+      "type": "object",
+      "required": [
+        "safe_to_spend_week",
+        "flexible_until_payday",
+        "days_left_in_week",
+        "days_to_income",
+        "next_income_date"
+      ],
+      "properties": {
+        "safe_to_spend_week": {
+          "$ref": "../common.schema.json#/definitions/Money"
+        },
+        "flexible_until_payday": {
+          "$ref": "../common.schema.json#/definitions/Money"
+        },
+        "days_left_in_week": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 7
+        },
+        "days_to_income": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "next_income_date": {
+          "anyOf": [
+            {
+              "$ref": "../common.schema.json#/definitions/Date"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "shortfall": {
+          "$ref": "../common.schema.json#/definitions/Money"
+        }
+      },
+      "additionalProperties": false
+    },
+    "AffordabilityResult": {
+      "title": "AffordabilityResult",
+      "type": "object",
+      "required": [
+        "amount_checked",
+        "price_source",
+        "verdict",
+        "safe_to_spend_week",
+        "remaining_after"
+      ],
+      "properties": {
+        "amount_checked": {
+          "$ref": "../common.schema.json#/definitions/Money"
+        },
+        "price_source": {
+          "description": "Where the amount came from. 'observation' = read from a capture; the answer must say the price was read, not known.",
+          "type": "string",
+          "enum": [
+            "basket",
+            "stated_amount",
+            "observation"
+          ]
+        },
+        "observation_id": {
+          "$ref": "../common.schema.json#/definitions/Ref"
+        },
+        "category": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "verdict": {
+          "type": "string",
+          "enum": [
+            "FITS",
+            "TIGHT",
+            "EXCEEDS",
+            "UNKNOWN"
+          ]
+        },
+        "safe_to_spend_week": {
+          "anyOf": [
+            {
+              "$ref": "../common.schema.json#/definitions/Money"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "remaining_after": {
+          "anyOf": [
+            {
+              "$ref": "../common.schema.json#/definitions/Money"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "usual_week_median": {
+          "$ref": "../common.schema.json#/definitions/Money"
+        },
+        "difference_vs_usual": {
+          "$ref": "../common.schema.json#/definitions/Money"
+        }
+      },
+      "if": {
+        "properties": {
+          "price_source": {
+            "const": "observation"
+          }
+        },
+        "required": [
+          "price_source"
+        ]
+      },
+      "then": {
+        "required": [
+          "observation_id"
+        ]
+      },
+      "additionalProperties": false
+    }
+  }
+}

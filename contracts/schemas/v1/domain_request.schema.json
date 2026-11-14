@@ -1,0 +1,81 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://contracts.example/v1/domain_request.schema.json",
+  "title": "DomainRequest",
+  "description": "What the orchestrator sends to a capability (and what the S-Bank Coach agent receives on POST /v1/turn). Self-contained: the capability may be stateless.",
+  "type": "object",
+  "required": ["schema", "request_id", "turn_id", "session_id", "capability_id", "user_ref", "locale", "utterance", "observations", "captures", "conversation", "output_constraints", "deadline_ms"],
+  "properties": {
+    "schema": { "const": "platform.domain_request/v1" },
+    "request_id": { "$ref": "common.schema.json#/definitions/Ref" },
+    "turn_id": { "$ref": "common.schema.json#/definitions/Ref" },
+    "session_id": { "$ref": "common.schema.json#/definitions/Ref" },
+    "capability_id": { "$ref": "common.schema.json#/definitions/CapabilityId" },
+    "user_ref": { "$ref": "common.schema.json#/definitions/Ref" },
+    "locale": { "$ref": "common.schema.json#/definitions/Locale" },
+    "utterance": { "anyOf": [{ "type": "string", "minLength": 1, "maxLength": 1000 }, { "type": "null" }] },
+    "intent_hint": {
+      "title": "IntentHint",
+      "description": "Optional pre-classification (e.g. from an on-device router). Capabilities may ignore it.",
+      "type": "object",
+      "required": ["intent", "confidence", "source"],
+      "properties": {
+        "intent": { "$ref": "common.schema.json#/definitions/IntentId" },
+        "slots": { "type": "object" },
+        "confidence": { "$ref": "common.schema.json#/definitions/Probability" },
+        "source": { "$ref": "common.schema.json#/definitions/Ref" }
+      },
+      "additionalProperties": false
+    },
+    "observations": {
+      "description": "What the platform read from captures (for purposes with delivery 'observation').",
+      "type": "array",
+      "maxItems": 4,
+      "items": { "$ref": "observation.schema.json" }
+    },
+    "captures": {
+      "description": "Raw minimised captures, only for purposes with delivery 'media'.",
+      "type": "array",
+      "maxItems": 4,
+      "items": { "$ref": "context_capture.schema.json" }
+    },
+    "conversation": {
+      "title": "ConversationContext",
+      "type": "object",
+      "required": ["ref", "recent_turns"],
+      "properties": {
+        "ref": { "$ref": "common.schema.json#/definitions/Ref" },
+        "recent_turns": {
+          "type": "array",
+          "maxItems": 10,
+          "items": { "$ref": "common.schema.json#/definitions/ConversationTurn" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "output_constraints": {
+      "title": "OutputConstraints",
+      "type": "object",
+      "required": ["speech_max_words", "discreet_mode", "display"],
+      "properties": {
+        "speech_max_words": { "type": "integer", "minimum": 5, "maximum": 60 },
+        "discreet_mode": { "type": "boolean" },
+        "display": { "$ref": "common.schema.json#/definitions/OutputDisplay" }
+      },
+      "additionalProperties": false
+    },
+    "device_capabilities": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/definitions/DeviceCapability" }
+    },
+    "deadline_ms": {
+      "description": "The capability must answer (or the adapter falls back) within this time.",
+      "type": "integer",
+      "minimum": 500,
+      "maximum": 15000
+    }
+  },
+  "patternProperties": { "^x_": {} },
+  "additionalProperties": false
+}

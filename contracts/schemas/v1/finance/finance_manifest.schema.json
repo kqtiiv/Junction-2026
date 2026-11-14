@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://contracts.example/v1/finance/finance_manifest.schema.json",
+  "title": "FinanceCapabilityManifest",
+  "description": "platform.capability_manifest/v1 for S-Bank Coach: only known finance intents and action kinds.",
+  "allOf": [
+    { "$ref": "../capability_manifest.schema.json" },
+    {
+      "properties": {
+        "capability_id": { "const": "sbank.coach" },
+        "intents": { "items": { "properties": { "id": { "$ref": "finance.schema.json#/definitions/FinanceIntent" } } } },
+        "action_kinds": { "items": { "properties": { "kind": { "$ref": "finance.schema.json#/definitions/FinanceActionKind" } } } }
+      }
+    }
+  ]
+}

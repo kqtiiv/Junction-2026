@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://contracts.example/v1/model_provider.schema.json",
+  "title": "ModelProvider",
+  "description": "Registry entry for a model the platform uses (ASR, TTS, router, OCR, embeddings, LLM), wherever it runs. Swapping cloud for on-device means changing registry entries, not contracts.",
+  "type": "object",
+  "required": ["schema", "provider_id", "kind", "location", "model_ref", "version", "languages", "data_policy", "slo", "status"],
+  "properties": {
+    "schema": { "const": "platform.model_provider/v1" },
+    "provider_id": { "$ref": "common.schema.json#/definitions/Ref" },
+    "kind": { "type": "string", "enum": ["asr", "tts", "router", "llm", "vision_ocr", "embedding"] },
+    "location": { "type": "string", "enum": ["device", "backend", "cloud"] },
+    "model_ref": { "description": "Opaque to callers.", "type": "string", "maxLength": 128 },
+    "version": { "type": "string", "maxLength": 64 },
+    "languages": { "type": "array", "items": { "$ref": "common.schema.json#/definitions/Locale" } },
+    "data_policy": {
+      "title": "DataPolicy",
+      "type": "object",
+      "required": ["leaves_device", "retention"],
+      "properties": {
+        "leaves_device": { "type": "boolean" },
+        "retention": { "type": "string", "maxLength": 64 },
+        "region": { "type": "string", "maxLength": 32 }
+      },
+      "additionalProperties": false
+    },
+    "slo": {
+      "title": "ProviderSlo",
+      "type": "object",
+      "required": ["p50_ms", "p95_ms"],
+      "properties": {
+        "p50_ms": { "type": "integer", "minimum": 1 },
+        "p95_ms": { "type": "integer", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "status": { "type": "string", "enum": ["active", "shadow", "canary", "disabled"] },
+    "fallback_provider_id": { "$ref": "common.schema.json#/definitions/Ref" }
+  },
+  "allOf": [
+    {
+      "$comment": "On-device models cannot claim to send data off the device.",
+      "if": { "properties": { "location": { "const": "device" } }, "required": ["location"] },
+      "then": { "properties": { "data_policy": { "properties": { "leaves_device": { "const": false } } } } }
+    }
+  ],
+  "patternProperties": { "^x_": {} },
+  "additionalProperties": false
+}
