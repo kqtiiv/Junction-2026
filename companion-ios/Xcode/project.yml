@@ -108,6 +108,7 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.junction26.companion.uitests
+        GENERATE_INFOPLIST_FILE: YES
         "CODE_SIGN_IDENTITY[sdk=iphonesimulator*]": "-"
         TEST_TARGET_NAME: CompanionSim
 
