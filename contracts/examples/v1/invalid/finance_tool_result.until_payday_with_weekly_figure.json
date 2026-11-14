@@ -1,0 +1,72 @@
+{
+  "schema": "platform.tool_result/v1",
+  "ok": true,
+  "calc_id": "calc_sts_pet_101",
+  "tool": "finance.get_safe_to_spend_until_payday",
+  "tool_version": "pet@617172b",
+  "epistemic": "estimate",
+  "data_mode": "balance",
+  "as_of": "2026-09-05T08:00:00+03:00",
+  "result": {
+    "as_of_date": "2026-09-05",
+    "balance": {
+      "amount": "1374.22",
+      "currency": "EUR"
+    },
+    "next_payday": "2026-09-15",
+    "days_to_payday": 10,
+    "reserved": {
+      "regular_bills_still_due": {
+        "amount": "626.30",
+        "currency": "EUR"
+      },
+      "irregular_reserve_left": {
+        "amount": "227.81",
+        "currency": "EUR"
+      },
+      "savings_still_planned": {
+        "amount": "0.00",
+        "currency": "EUR"
+      },
+      "cushion": {
+        "amount": "200.00",
+        "currency": "EUR"
+      }
+    },
+    "free_until_payday": {
+      "amount": "320.11",
+      "currency": "EUR"
+    },
+    "safe_to_spend_today": {
+      "amount": "32.01",
+      "currency": "EUR"
+    },
+    "flexible_spent_this_cycle": {
+      "amount": "430.02",
+      "currency": "EUR"
+    },
+    "planned_total": {
+      "amount": "0.00",
+      "currency": "EUR"
+    },
+    "status": "ok",
+    "safe_to_spend_week": {
+      "amount": "224.07",
+      "currency": "EUR"
+    }
+  },
+  "assumptions": [
+    "Bills still due, irregular reserve and savings are estimated from your previous pay cycles",
+    "Next payday estimated from your usual salary day (2026-09-15)",
+    "Safety buffer: cushion €200, irregular q50",
+    "Simulated date 2026-09-05 on S-Pankki's synthetic Junction 2026 dataset"
+  ],
+  "missing_data": [],
+  "warnings": [],
+  "confidence": "medium",
+  "x_engine": {
+    "repo": "personal-economic-trainer",
+    "commit": "617172b",
+    "buffer": "cushion €200, irregular q50"
+  }
+}

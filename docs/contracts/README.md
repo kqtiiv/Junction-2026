@@ -12,7 +12,7 @@ The executable contracts live in [`../../contracts/`](../../contracts/README.md)
 | `GestureOrInputEvent` | `voice_intent.schema.json` with `invocation: "glasses_input"`, plus `common.schema.json#/definitions/GlassesInput` | `platform.voice_intent/v1` | implemented (mapped) | DEC-007, DEC-009 |
 | `CapabilityRequest` | `domain_request.schema.json` | `platform.domain_request/v1` | implemented (mapped name) | DEC-009 |
 | `CapabilityResponse` | `domain_response.schema.json`, streamed as `domain_response_event.schema.json` | `platform.domain_response/v1` | implemented (mapped name) | DEC-009 |
-| `FinanceInsight` | `finance/finance_tool_result.schema.json` (overlay on `tool_result`) + `insight_card.schema.json` with finance `data_mode` | `platform.tool_result/v1`, `platform.insight_card/v1` | implemented (mapped) | DEC-009, DEC-019 |
+| `FinanceInsight` | `finance/finance_tool_result.schema.json` (overlay on `tool_result`) + `insight_card.schema.json` with finance `data_mode` | `platform.tool_result/v1`, `platform.insight_card/v1` | implemented (mapped); until-payday shape from the S-Pankki engine | DEC-009, DEC-019, DEC-025 |
 | `DeterministicToolResult` | `tool_result.schema.json` (+ `tool_descriptor.schema.json`) | `platform.tool_result/v1` | implemented (mapped name) | DEC-019 |
 | `InsightCard` | `insight_card.schema.json` | `platform.insight_card/v1` | implemented | — |
 | `ActionProposal` | `action_proposal.schema.json` | `platform.action_proposal/v1` | implemented; hardening proposed | DEC-018, DEC-012 |

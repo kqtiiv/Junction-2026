@@ -102,6 +102,7 @@ export type FinanceToolName =
   | "finance.get_transactions"
   | "finance.get_basket_breakdown"
   | "finance.get_safe_to_spend"
+  | "finance.get_safe_to_spend_until_payday"
   | "finance.get_upcoming_commitments"
   | "finance.simulate_spending_change"
   | "finance.get_savings_projection"
@@ -150,6 +151,7 @@ export interface ContractsIndex {
   FinanceActionKind?: FinanceActionKind;
   FinanceToolName?: FinanceToolName;
   SafeToSpendResult?: SafeToSpendResult;
+  PaydaySafeToSpendResult?: PaydaySafeToSpendResult;
   AffordabilityResult?: AffordabilityResult;
   GoldenCase?: GoldenCase;
   InsightCard?: InsightCard;
@@ -682,6 +684,52 @@ export interface SafeToSpendResult {
   days_to_income: number;
   next_income_date: Date | null;
   shortfall?: Money;
+  stated_weekly_amount?: Money1;
+  planned_this_week?: Money2;
+}
+/**
+ * The weekly amount the user said (user_stated source, no bank data). Shown as 'your figure'.
+ */
+export interface Money1 {
+  amount: DecimalString;
+  currency: "EUR";
+}
+/**
+ * Confirmed plans counted against the stated weekly amount this week.
+ */
+export interface Money2 {
+  amount: DecimalString;
+  currency: "EUR";
+}
+/**
+ * Safe to spend from the S-Bank Coach engine (DEC-025): balance minus what is reserved until payday, spread over the days to payday. Per day, not per week.
+ */
+export interface PaydaySafeToSpendResult {
+  as_of_date: Date;
+  balance: Money;
+  next_payday: Date;
+  days_to_payday: number;
+  /**
+   * Money held back until payday. Keys are the engine's reserve names.
+   */
+  reserved: {
+    [k: string]: Money;
+  };
+  free_until_payday: Money;
+  safe_to_spend_today: Money;
+  flexible_spent_this_cycle?: Money;
+  planned_total: Money3;
+  /**
+   * at_risk: the money reserved for bills exceeds the balance.
+   */
+  status: "ok" | "at_risk";
+}
+/**
+ * Confirmed plans already subtracted from free_until_payday.
+ */
+export interface Money3 {
+  amount: DecimalString;
+  currency: "EUR";
 }
 export interface AffordabilityResult {
   amount_checked: Money;
@@ -696,6 +744,21 @@ export interface AffordabilityResult {
   remaining_after: Money | null;
   usual_week_median?: Money;
   difference_vs_usual?: Money;
+  /**
+   * What remaining_after covers: this week (fixture, user_stated) or until payday (S-Bank Coach engine, DEC-025). Absent means week.
+   */
+  period?: "week" | "until_payday";
+  free_until_payday?: Money;
+  days_to_payday?: number;
+  next_payday?: Date;
+  safe_per_day_after?: Money4;
+}
+/**
+ * remaining_after spread over the days to payday, rounded down to the cent.
+ */
+export interface Money4 {
+  amount: DecimalString;
+  currency: "EUR";
 }
 /**
  * A test case a capability ships in its fixtures. The platform's fixture runner replays it through the adapter (any backend) and the deterministic fast path; registration fails if expected values differ or any spoken/card number is unverified.

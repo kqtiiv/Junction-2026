@@ -167,7 +167,7 @@ Green = reusable platform · red = finance-only · blue = Meta-provided · grey 
 
 ### 2.2 One voice turn with a capture, end to end
 
-Voice invocation **only launches the app**: *"Hey Meta, start ‹app›"* delivers a `LaunchApp` action and no utterance (DEC-021). The question is captured afterwards by our own ASR on the Bluetooth mic. Because the invocation phrase names the app rather than a capability, the router picks the capability from the transcript ("ask Home…", "does this fit my week?").
+Voice invocation **only launches the app**: *"Hey Meta, start ‹app›"* delivers a `LaunchApp` action and no utterance (DEC-021). The question is captured afterwards by our own ASR on the Bluetooth mic. Because the invocation phrase names the app rather than a capability, the router picks the capability from the transcript ("ask Home…", "can I afford this?").
 
 ```mermaid
 sequenceDiagram
@@ -188,7 +188,7 @@ sequenceDiagram
   end
   P->>P: route HFP mic · earcon (<300 ms) · listening
   P->>O: PUT device-state (interaction: listening, seq n)
-  U->>P: "Does this fit my week?" (looking at a price label)
+  U->>P: "Can I afford this?" (looking at a price label)
   P->>P: device ASR → transcript
   P->>G: start short camera stream → capturePhoto(.jpeg) → stop stream
   P->>P: orient → strip EXIF/GPS → downscale
@@ -1037,7 +1037,7 @@ The platform's fixture runner replays the golden files through the **adapter** (
 
 | Proof | Demo moment |
 |---|---|
-| Interaction started from Ray-Ban Meta | Presenter says *"Hey Meta, start S-Bank Coach."* Earcon in the glasses: the app is listening. Looking at a shelf label (wireless headphones, 79,90 €), they ask *"Does this fit my week?"* Voice invocation only launches the app (DEC-021) and is **experimental** (DEC-004). If the hour-0 gate turned it off, the presenter presses the capture button or uses phone push-to-talk instead. The overlay shows the active experimental features. |
+| Interaction started from Ray-Ban Meta | Presenter says *"Hey Meta, start S-Bank Coach."* Earcon in the glasses: the app is listening. Looking at a shelf label (wireless headphones, 79,90 €), they ask *"Can I afford this?"* The answer comes from the S-Bank Coach engine on S-Pankki's dataset: what the purchase leaves per day until payday (DEC-024, DEC-025). Voice invocation only launches the app (DEC-021) and is **experimental** (DEC-004). If the hour-0 gate turned it off, the presenter presses the capture button or uses phone push-to-talk instead. The overlay shows the active experimental features. |
 | One capture/voice event | The glasses photo appears in the phone UI as an Observation (*"Read: 79,90 € · observed"*) with a "photo not kept" chip. The finance capability never receives the image. |
 | Request through the domain adapter | Debug overlay shows `capability: sbank.coach · backend: remote_agent@0.4 · verified ✓ · 1.9 s`. |
 | Grounded finance answer | Card with `calc_aff_40` + `calc_sts_91`; tap **How was this calculated?** |

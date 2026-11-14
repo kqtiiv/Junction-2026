@@ -265,6 +265,15 @@ class Currency(Enum):
 
 @dataclass
 class Money:
+    """remaining_after spread over the days to payday, rounded down to the cent.
+    
+    Confirmed plans already subtracted from free_until_payday.
+    
+    Confirmed plans counted against the stated weekly amount this week.
+    
+    The weekly amount the user said (user_stated source, no bank data). Shown as 'your
+    figure'.
+    """
     amount: str
     currency: Currency
 
@@ -518,6 +527,14 @@ class ActionResult:
         return result
 
 
+class Period(Enum):
+    """What remaining_after covers: this week (fixture, user_stated) or until payday (S-Bank
+    Coach engine, DEC-025). Absent means week.
+    """
+    UNTIL_PAYDAY = "until_payday"
+    WEEK = "week"
+
+
 class PriceSource(Enum):
     """Where the amount came from. 'observation' = read from a capture; the answer must say the
     price was read, not known.
@@ -543,9 +560,19 @@ class AffordabilityResult:
     """
     verdict: Verdict
     category: Optional[str] = None
+    days_to_payday: Optional[int] = None
     difference_vs_usual: Optional[Money] = None
+    free_until_payday: Optional[Money] = None
+    next_payday: Optional[datetime] = None
     observation_id: Optional[str] = None
+    period: Optional[Period] = None
+    """What remaining_after covers: this week (fixture, user_stated) or until payday (S-Bank
+    Coach engine, DEC-025). Absent means week.
+    """
     remaining_after: Optional[Money] = None
+    safe_per_day_after: Optional[Money] = None
+    """remaining_after spread over the days to payday, rounded down to the cent."""
+
     safe_to_spend_week: Optional[Money] = None
     usual_week_median: Optional[Money] = None
 
@@ -556,12 +583,17 @@ class AffordabilityResult:
         price_source = PriceSource(obj.get("price_source"))
         verdict = Verdict(obj.get("verdict"))
         category = from_union([from_str, from_none], obj.get("category"))
+        days_to_payday = from_union([from_int, from_none], obj.get("days_to_payday"))
         difference_vs_usual = from_union([Money.from_dict, from_none], obj.get("difference_vs_usual"))
+        free_until_payday = from_union([Money.from_dict, from_none], obj.get("free_until_payday"))
+        next_payday = from_union([from_datetime, from_none], obj.get("next_payday"))
         observation_id = from_union([from_str, from_none], obj.get("observation_id"))
+        period = from_union([Period, from_none], obj.get("period"))
         remaining_after = from_union([Money.from_dict, from_none], obj.get("remaining_after"))
+        safe_per_day_after = from_union([Money.from_dict, from_none], obj.get("safe_per_day_after"))
         safe_to_spend_week = from_union([Money.from_dict, from_none], obj.get("safe_to_spend_week"))
         usual_week_median = from_union([Money.from_dict, from_none], obj.get("usual_week_median"))
-        return AffordabilityResult(amount_checked, price_source, verdict, category, difference_vs_usual, observation_id, remaining_after, safe_to_spend_week, usual_week_median)
+        return AffordabilityResult(amount_checked, price_source, verdict, category, days_to_payday, difference_vs_usual, free_until_payday, next_payday, observation_id, period, remaining_after, safe_per_day_after, safe_to_spend_week, usual_week_median)
 
     def to_dict(self) -> dict:
         result: dict = {}
@@ -570,11 +602,21 @@ class AffordabilityResult:
         result["verdict"] = to_enum(Verdict, self.verdict)
         if self.category is not None:
             result["category"] = from_union([from_str, from_none], self.category)
+        if self.days_to_payday is not None:
+            result["days_to_payday"] = from_union([from_int, from_none], self.days_to_payday)
         if self.difference_vs_usual is not None:
             result["difference_vs_usual"] = from_union([lambda x: to_class(Money, x), from_none], self.difference_vs_usual)
+        if self.free_until_payday is not None:
+            result["free_until_payday"] = from_union([lambda x: to_class(Money, x), from_none], self.free_until_payday)
+        if self.next_payday is not None:
+            result["next_payday"] = from_union([lambda x: x.isoformat(), from_none], self.next_payday)
         if self.observation_id is not None:
             result["observation_id"] = from_union([from_str, from_none], self.observation_id)
+        if self.period is not None:
+            result["period"] = from_union([lambda x: to_enum(Period, x), from_none], self.period)
         result["remaining_after"] = from_union([lambda x: to_class(Money, x), from_none], self.remaining_after)
+        if self.safe_per_day_after is not None:
+            result["safe_per_day_after"] = from_union([lambda x: to_class(Money, x), from_none], self.safe_per_day_after)
         result["safe_to_spend_week"] = from_union([lambda x: to_class(Money, x), from_none], self.safe_to_spend_week)
         if self.usual_week_median is not None:
             result["usual_week_median"] = from_union([lambda x: to_class(Money, x), from_none], self.usual_week_median)
@@ -1964,6 +2006,7 @@ class FinanceToolName(Enum):
     FINANCE_GET_BASKET_BREAKDOWN = "finance.get_basket_breakdown"
     FINANCE_GET_CALCULATION = "finance.get_calculation"
     FINANCE_GET_SAFE_TO_SPEND = "finance.get_safe_to_spend"
+    FINANCE_GET_SAFE_TO_SPEND_UNTIL_PAYDAY = "finance.get_safe_to_spend_until_payday"
     FINANCE_GET_SAVINGS_PROJECTION = "finance.get_savings_projection"
     FINANCE_GET_SPENDING_SUMMARY = "finance.get_spending_summary"
     FINANCE_GET_TRANSACTIONS = "finance.get_transactions"
@@ -2293,6 +2336,66 @@ class ModelProvider:
         return result
 
 
+class PaydaySafeToSpendResultStatus(Enum):
+    """at_risk: the money reserved for bills exceeds the balance."""
+
+    AT_RISK = "at_risk"
+    OK = "ok"
+
+
+@dataclass
+class PaydaySafeToSpendResult:
+    """Safe to spend from the S-Bank Coach engine (DEC-025): balance minus what is reserved
+    until payday, spread over the days to payday. Per day, not per week.
+    """
+    as_of_date: datetime
+    balance: Money
+    days_to_payday: int
+    free_until_payday: Money
+    next_payday: datetime
+    planned_total: Money
+    """Confirmed plans already subtracted from free_until_payday."""
+
+    reserved: Dict[str, Money]
+    """Money held back until payday. Keys are the engine's reserve names."""
+
+    safe_to_spend_today: Money
+    status: PaydaySafeToSpendResultStatus
+    """at_risk: the money reserved for bills exceeds the balance."""
+
+    flexible_spent_this_cycle: Optional[Money] = None
+
+    @staticmethod
+    def from_dict(obj: Any) -> 'PaydaySafeToSpendResult':
+        assert isinstance(obj, dict)
+        as_of_date = from_datetime(obj.get("as_of_date"))
+        balance = Money.from_dict(obj.get("balance"))
+        days_to_payday = from_int(obj.get("days_to_payday"))
+        free_until_payday = Money.from_dict(obj.get("free_until_payday"))
+        next_payday = from_datetime(obj.get("next_payday"))
+        planned_total = Money.from_dict(obj.get("planned_total"))
+        reserved = from_dict(Money.from_dict, obj.get("reserved"))
+        safe_to_spend_today = Money.from_dict(obj.get("safe_to_spend_today"))
+        status = PaydaySafeToSpendResultStatus(obj.get("status"))
+        flexible_spent_this_cycle = from_union([Money.from_dict, from_none], obj.get("flexible_spent_this_cycle"))
+        return PaydaySafeToSpendResult(as_of_date, balance, days_to_payday, free_until_payday, next_payday, planned_total, reserved, safe_to_spend_today, status, flexible_spent_this_cycle)
+
+    def to_dict(self) -> dict:
+        result: dict = {}
+        result["as_of_date"] = self.as_of_date.isoformat()
+        result["balance"] = to_class(Money, self.balance)
+        result["days_to_payday"] = from_int(self.days_to_payday)
+        result["free_until_payday"] = to_class(Money, self.free_until_payday)
+        result["next_payday"] = self.next_payday.isoformat()
+        result["planned_total"] = to_class(Money, self.planned_total)
+        result["reserved"] = from_dict(lambda x: to_class(Money, x), self.reserved)
+        result["safe_to_spend_today"] = to_class(Money, self.safe_to_spend_today)
+        result["status"] = to_enum(PaydaySafeToSpendResultStatus, self.status)
+        if self.flexible_spent_this_cycle is not None:
+            result["flexible_spent_this_cycle"] = from_union([lambda x: to_class(Money, x), from_none], self.flexible_spent_this_cycle)
+        return result
+
+
 @dataclass
 class SafeToSpendResult:
     days_left_in_week: int
@@ -2300,7 +2403,14 @@ class SafeToSpendResult:
     flexible_until_payday: Money
     safe_to_spend_week: Money
     next_income_date: Optional[datetime] = None
+    planned_this_week: Optional[Money] = None
+    """Confirmed plans counted against the stated weekly amount this week."""
+
     shortfall: Optional[Money] = None
+    stated_weekly_amount: Optional[Money] = None
+    """The weekly amount the user said (user_stated source, no bank data). Shown as 'your
+    figure'.
+    """
 
     @staticmethod
     def from_dict(obj: Any) -> 'SafeToSpendResult':
@@ -2310,8 +2420,10 @@ class SafeToSpendResult:
         flexible_until_payday = Money.from_dict(obj.get("flexible_until_payday"))
         safe_to_spend_week = Money.from_dict(obj.get("safe_to_spend_week"))
         next_income_date = from_union([from_datetime, from_none], obj.get("next_income_date"))
+        planned_this_week = from_union([Money.from_dict, from_none], obj.get("planned_this_week"))
         shortfall = from_union([Money.from_dict, from_none], obj.get("shortfall"))
-        return SafeToSpendResult(days_left_in_week, days_to_income, flexible_until_payday, safe_to_spend_week, next_income_date, shortfall)
+        stated_weekly_amount = from_union([Money.from_dict, from_none], obj.get("stated_weekly_amount"))
+        return SafeToSpendResult(days_left_in_week, days_to_income, flexible_until_payday, safe_to_spend_week, next_income_date, planned_this_week, shortfall, stated_weekly_amount)
 
     def to_dict(self) -> dict:
         result: dict = {}
@@ -2320,8 +2432,12 @@ class SafeToSpendResult:
         result["flexible_until_payday"] = to_class(Money, self.flexible_until_payday)
         result["safe_to_spend_week"] = to_class(Money, self.safe_to_spend_week)
         result["next_income_date"] = from_union([lambda x: x.isoformat(), from_none], self.next_income_date)
+        if self.planned_this_week is not None:
+            result["planned_this_week"] = from_union([lambda x: to_class(Money, x), from_none], self.planned_this_week)
         if self.shortfall is not None:
             result["shortfall"] = from_union([lambda x: to_class(Money, x), from_none], self.shortfall)
+        if self.stated_weekly_amount is not None:
+            result["stated_weekly_amount"] = from_union([lambda x: to_class(Money, x), from_none], self.stated_weekly_amount)
         return result
 
 
@@ -2682,6 +2798,7 @@ class ContractsIndex:
     money: Optional[Money] = None
     observation: Optional[Observation] = None
     output_display: Optional[OutputDisplay] = None
+    payday_safe_to_spend_result: Optional[PaydaySafeToSpendResult] = None
     probability: Optional[float] = None
     ref: Optional[str] = None
     risk: Optional[Risk] = None
@@ -2734,6 +2851,7 @@ class ContractsIndex:
         money = from_union([Money.from_dict, from_none], obj.get("Money"))
         observation = from_union([Observation.from_dict, from_none], obj.get("Observation"))
         output_display = from_union([OutputDisplay, from_none], obj.get("OutputDisplay"))
+        payday_safe_to_spend_result = from_union([PaydaySafeToSpendResult.from_dict, from_none], obj.get("PaydaySafeToSpendResult"))
         probability = from_union([from_float, from_none], obj.get("Probability"))
         ref = from_union([from_str, from_none], obj.get("Ref"))
         risk = from_union([Risk, from_none], obj.get("Risk"))
@@ -2743,7 +2861,7 @@ class ContractsIndex:
         tool_result = from_union([ToolResult.from_dict, from_none], obj.get("ToolResult"))
         user_confirmation = from_union([UserConfirmation.from_dict, from_none], obj.get("UserConfirmation"))
         voice_intent = from_union([VoiceIntent.from_dict, from_none], obj.get("VoiceIntent"))
-        return ContractsIndex(action_kind, action_proposal, action_result, affordability_result, capability_id, confidence, confirm_channel, context_capture, conversation_turn, data_mode, date, decimal_string, deterministic_tool, device_capability, device_session_state, domain_capability, domain_event, domain_request, domain_response, domain_response_event, epistemic, error_envelope, error_info, finance_action_kind, finance_intent, finance_tool_name, glasses_input, golden_case, insight_card, intent_id, locale, l_text, media_uri, missing_data, missing_data_code, model_provider, money, observation, output_display, probability, ref, risk, safe_to_spend_result, sha256, timestamp, tool_result, user_confirmation, voice_intent)
+        return ContractsIndex(action_kind, action_proposal, action_result, affordability_result, capability_id, confidence, confirm_channel, context_capture, conversation_turn, data_mode, date, decimal_string, deterministic_tool, device_capability, device_session_state, domain_capability, domain_event, domain_request, domain_response, domain_response_event, epistemic, error_envelope, error_info, finance_action_kind, finance_intent, finance_tool_name, glasses_input, golden_case, insight_card, intent_id, locale, l_text, media_uri, missing_data, missing_data_code, model_provider, money, observation, output_display, payday_safe_to_spend_result, probability, ref, risk, safe_to_spend_result, sha256, timestamp, tool_result, user_confirmation, voice_intent)
 
     def to_dict(self) -> dict:
         result: dict = {}
@@ -2825,6 +2943,8 @@ class ContractsIndex:
             result["Observation"] = from_union([lambda x: to_class(Observation, x), from_none], self.observation)
         if self.output_display is not None:
             result["OutputDisplay"] = from_union([lambda x: to_enum(OutputDisplay, x), from_none], self.output_display)
+        if self.payday_safe_to_spend_result is not None:
+            result["PaydaySafeToSpendResult"] = from_union([lambda x: to_class(PaydaySafeToSpendResult, x), from_none], self.payday_safe_to_spend_result)
         if self.probability is not None:
             result["Probability"] = from_union([to_float, from_none], self.probability)
         if self.ref is not None:

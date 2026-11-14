@@ -14,9 +14,10 @@ export const TOKEN = "test-token";
 export const USER = "u_7f3a";
 export const auth = { authorization: `Bearer ${TOKEN}` };
 
-export function makeApp(opts: { remote?: AgentBackend; deadlineMs?: number; userStated?: { now: () => Date } } = {}) {
+export function makeApp(opts: { remote?: AgentBackend; deadlineMs?: number; userStated?: { now: () => Date }; engine?: FinanceEngine } = {}) {
   const keys = loadSigningKeys();
-  const engine: FinanceEngine = opts.userStated ? new UserStatedFinanceEngine(opts.userStated.now) : new FixtureFinanceEngine();
+  const engine: FinanceEngine = opts.engine
+    ?? (opts.userStated ? new UserStatedFinanceEngine(opts.userStated.now) : new FixtureFinanceEngine());
   const fastPath = new DeterministicFastPath(engine, keys.publicKey);
   const registry = new CapabilityRegistry();
   registry.register(new SBankCoachAdapter({ engine, fastPath, ...(opts.remote ? { remote: opts.remote } : {}) }));

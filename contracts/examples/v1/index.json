@@ -287,6 +287,39 @@
       "schema": "error_envelope.schema.json",
       "valid": false,
       "reason": "retry_after_ms is only allowed on retryable errors"
+    },
+    {
+      "file": "valid/finance/tool_result.safe_to_spend_until_payday.json",
+      "schema": "finance/finance_tool_result.schema.json",
+      "valid": true
+    },
+    {
+      "file": "valid/finance/tool_result.affordability_until_payday.json",
+      "schema": "finance/finance_tool_result.schema.json",
+      "valid": true
+    },
+    {
+      "file": "valid/finance/tool_result.safe_to_spend_until_payday_at_risk.json",
+      "schema": "finance/finance_tool_result.schema.json",
+      "valid": true
+    },
+    {
+      "file": "invalid/finance_tool_result.until_payday_float_money.json",
+      "schema": "finance/finance_tool_result.schema.json",
+      "valid": false,
+      "reason": "Money must be a decimal string, never a JSON number"
+    },
+    {
+      "file": "invalid/finance_tool_result.until_payday_with_weekly_figure.json",
+      "schema": "finance/finance_tool_result.schema.json",
+      "valid": false,
+      "reason": "An until-payday result carries no weekly figure (DEC-025)"
+    },
+    {
+      "file": "invalid/finance_tool_result.affordability_until_payday_without_per_day.json",
+      "schema": "finance/finance_tool_result.schema.json",
+      "valid": false,
+      "reason": "Until-payday affordability must say what is left per day"
     }
   ]
 }

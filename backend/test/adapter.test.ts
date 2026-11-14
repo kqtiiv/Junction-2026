@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { AgentBackend } from "../src/capabilities/sbank-coach/backend.ts";
-import type { ActionResult, DomainRequest, DomainResponse, UserConfirmation } from "../src/contracts.ts";
+import type { ActionResult, DomainRequest, DomainResponse, ToolResult, UserConfirmation } from "../src/contracts.ts";
 import { auth, finalOf, makeApp, newSession, parseSse, sleep, turn, voiceIntent } from "./helpers.ts";
 
 class FakeAgent implements AgentBackend {
@@ -61,7 +61,7 @@ test("agent that invents numbers: unverified speech and cards are dropped", asyn
 test("agent that answers with real calc_ids passes verification", async () => {
   const { app, engine } = makeApp();
   const grounded = (req: DomainRequest): DomainResponse => {
-    const sts = engine.getSafeToSpend(req.user_ref)!;
+    const sts = engine.getSafeToSpend(req.user_ref) as ToolResult;   // the fixture source answers synchronously
     return {
       schema: "platform.domain_response/v1", request_id: req.request_id, status: "answered",
       speech: { text: "Roughly 90 euros until Sunday, based on your balance.", epistemic: "estimate" },

@@ -24,6 +24,11 @@
       "then": { "properties": { "result": { "$ref": "finance.schema.json#/definitions/SafeToSpendResult" } } }
     },
     {
+      "$comment": "Until-payday safe-to-spend from the S-Bank Coach engine (DEC-025).",
+      "if": { "properties": { "ok": { "const": true }, "tool": { "const": "finance.get_safe_to_spend_until_payday" } }, "required": ["ok", "tool"] },
+      "then": { "properties": { "result": { "$ref": "finance.schema.json#/definitions/PaydaySafeToSpendResult" } } }
+    },
+    {
       "if": { "properties": { "ok": { "const": true }, "tool": { "const": "finance.calculate_affordability" } }, "required": ["ok", "tool"] },
       "then": { "properties": { "result": { "$ref": "finance.schema.json#/definitions/AffordabilityResult" } } }
     },

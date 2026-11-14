@@ -207,6 +207,7 @@ export class DeterministicFastPath implements AgentBackend {
 
   /** The safe-to-spend card, built straight from the engine result (also sent back after a confirmation). */
   private stsCard(sts: ToolResult): InsightCard {
+    if (isPayday(sts)) return paydayStsCard(sts);
     const r = sts.result as { safe_to_spend_week: Money; flexible_until_payday: Money; days_left_in_week: number;
       stated_weekly_amount?: Money; planned_this_week?: Money };
     const n = roundEuros(r.safe_to_spend_week.amount).toString();
@@ -246,9 +247,10 @@ export class DeterministicFastPath implements AgentBackend {
   /**
    * @param gotIt the weekly amount the user just gave (answering the coach's question, or "set")
    */
-  private safeToSpend(req: DomainRequest, gotIt?: string, mode: "answer" | "set" = "answer"): DomainResponse {
-    const sts = this.engine.getSafeToSpend(req.user_ref);
+  private async safeToSpend(req: DomainRequest, gotIt?: string, mode: "answer" | "set" = "answer"): Promise<DomainResponse> {
+    const sts = await this.engine.getSafeToSpend(req.user_ref);
     if (!sts) return this.askForWeeklyAmount(req, { intent: "safe_to_spend" });
+    if (isPayday(sts)) return this.reply(req, "answered", paydaySafeToSpendText(sts, req.locale), "estimate", [paydayStsCard(sts)], [], [sts]);
     const r = sts.result as { safe_to_spend_week: Money; flexible_until_payday: Money; days_left_in_week: number;
       stated_weekly_amount?: Money; planned_this_week?: Money };
     const l = req.locale;
@@ -278,9 +280,9 @@ export class DeterministicFastPath implements AgentBackend {
     return this.reply(req, "answered", text, kind, [card], [], [sts]);
   }
 
-  private affordability(req: DomainRequest, amount: string, source: "stated_amount" | "observation", observation?: Observation,
-    label?: string, gotIt?: string): DomainResponse {
-    const calc = this.engine.calculateAffordability(req.user_ref, {
+  private async affordability(req: DomainRequest, amount: string, source: "stated_amount" | "observation", observation?: Observation,
+    label?: string, gotIt?: string): Promise<DomainResponse> {
+    const calc = await this.engine.calculateAffordability(req.user_ref, {
       amount, priceSource: source, ...(observation ? { observationId: observation.observation_id } : {}),
     });
     if (!calc) {
@@ -288,6 +290,9 @@ export class DeterministicFastPath implements AgentBackend {
         ...(observation ? { observation } : {}), ...(label ? { label } : {}) });
     }
     const { result, sts } = calc;
+    if ((result.result as { period?: string }).period === "until_payday") {
+      return this.paydayAffordability(req, result, sts, amount, source, observation, label);
+    }
     const stated = this.engine.source === "user_stated";
     const r = result.result as { verdict: "FITS" | "TIGHT" | "EXCEEDS" | "UNKNOWN"; safe_to_spend_week: Money; remaining_after: Money };
     const l = req.locale;
@@ -368,12 +373,86 @@ export class DeterministicFastPath implements AgentBackend {
     return this.reply(req, "answered", text, kind, [card], proposals, [result, sts]);
   }
 
+  /** Affordability on the S-Bank Coach engine: what the purchase leaves per day until payday (DEC-025). */
+  private paydayAffordability(req: DomainRequest, result: ToolResult, sts: ToolResult, amount: string,
+    source: "stated_amount" | "observation", observation?: Observation, label?: string): DomainResponse {
+    const r = result.result as PaydayAffordability;
+    const l = req.locale;
+    const p = formatAmount(amount, l);
+    const perDay = roundEuros(r.safe_per_day_after.amount).toString();
+    const n = roundEuros(r.remaining_after.amount);
+    const nAbs = (n < 0n ? -n : n).toString();
+    const obs = source === "observation";
+    const fits = pick(l, obs
+      ? { en: `If that price is ${p}, it fits`, fi: `Jos hinta on ${p} euroa, se mahtuu` }
+      : { en: `${p} fits`, fi: `${p} euroa mahtuu` });
+    const over = pick(l, obs
+      ? { en: `If that price is ${p}, it's`, fi: `Jos hinta on ${p} euroa, se on` }
+      : { en: `${p} is`, fi: `${p} euroa on` });
+    const tightTail = perDay === "0"
+      ? pick(l, { en: "but it would use up almost all your money until payday.", fi: "mutta se veisi lähes kaikki rahasi palkkapäivään asti." })
+      : pick(l, { en: `but you'd only have about ${perDay} euros a day left until payday.`, fi: `mutta sinulle jäisi vain noin ${perDay} euroa päivässä palkkapäivään asti.` });
+    const ask = pick(l, { en: "Want me to plan it in?", fi: "Lisäänkö sen suunnitelmaan?" });
+    const text = {
+      FITS: pick(l, { en: `${fits}. You'd still have about ${perDay} euros a day until payday. ${ask}`,
+                      fi: `${fits}, ja sinulle jää noin ${perDay} euroa päivässä palkkapäivään asti. ${ask}` }),
+      TIGHT: `${fits}, ${tightTail} ${ask}`,
+      EXCEEDS: pick(l, { en: `${over} about ${nAbs} euros more than is safe to spend before payday.`,
+                         fi: `${over} noin ${nAbs} euroa enemmän kuin ennen palkkapäivää on turvallista käyttää.` }),
+      UNKNOWN: pick(l, { en: "I can't say if it fits. Details are on your phone.", fi: "En voi sanoa, mahtuuko se. Tiedot ovat puhelimessa." }),
+    }[r.verdict];
+
+    const verdictText: Record<typeof r.verdict, LText> = {
+      FITS: { en: "Fits", fi: "Mahtuu" },
+      TIGHT: { en: "Fits, but tight", fi: "Mahtuu, mutta tiukasti" },
+      EXCEEDS: { en: "Doesn't fit before payday", fi: "Ei mahdu ennen palkkapäivää" },
+      UNKNOWN: { en: "Can't tell", fi: "Ei voi arvioida" },
+    };
+    const card: InsightCard = {
+      schema: "platform.insight_card/v1",
+      card_id: `card_${result.calc_id}`,
+      capability_id: CAPABILITY_ID,
+      type: "metric",
+      title: { en: "Can you afford it?", fi: "Onko sinulla varaa tähän?" },
+      primary: { label: { en: "Per day until payday, after buying", fi: "Päivässä palkkapäivään asti oston jälkeen" }, value: r.safe_per_day_after, epistemic: "estimate" },
+      rows: [
+        obs
+          ? { label: { en: "Price on the label", fi: "Hintalapun hinta" }, value: { amount, currency: "EUR" }, epistemic: "observed",
+              note: { en: "Read by the camera. Tap to correct.", fi: "Kameran lukema. Korjaa napauttamalla." } }
+          : { label: { en: "Amount you asked about", fi: "Kysymäsi summa" }, value: { amount, currency: "EUR" }, epistemic: "fact",
+              note: { en: "As you said", fi: "Kuten sanoit" } },
+        { label: { en: "Free until payday", fi: "Vapaana palkkapäivään asti" }, value: r.free_until_payday, epistemic: "estimate" },
+        { label: { en: "Left until payday after buying", fi: "Jäljellä palkkapäivään oston jälkeen" }, value: r.remaining_after, epistemic: "estimate" },
+        { label: { en: "Days to payday", fi: "Päiviä palkkapäivään" }, value: String(r.days_to_payday), epistemic: "estimate" },
+        { label: { en: "Verdict", fi: "Arvio" }, value: (isFi(l) ? verdictText[r.verdict].fi : verdictText[r.verdict].en)!, epistemic: "calculated" },
+      ],
+      epistemic: "estimate",
+      ...(result.data_mode ? { data_mode: result.data_mode } : {}),
+      basis: {
+        calc_ids: [result.calc_id as string, sts.calc_id as string],
+        ...(observation ? { observation_ids: [observation.observation_id] } : {}),
+        as_of: result.as_of,
+      },
+      assumptions: result.assumptions.map((a) => ({ en: a })),
+      missing_data: [],
+      render_hints: { glasses_display_lines: [verdictText[r.verdict].en!.slice(0, 40), `€${perDay}/day left until payday`.slice(0, 40), "estimate"] },
+    };
+
+    const proposals: ActionProposal[] = [];
+    if (r.verdict === "FITS" || r.verdict === "TIGHT") {
+      const proposal = this.planProposal(req.user_ref, amount, safeLabel(label), r.free_until_payday.amount, r.remaining_after.amount, source, false, true);
+      proposals.push(proposal);
+      card.proposal_ids = [proposal.proposal_id];
+    }
+    return this.reply(req, "answered", text, "estimate", [card], proposals, [result, sts]);
+  }
+
   /**
    * Money in the proposal is left as plain decimal strings in `details` so the phone formats it
    * exactly like the cards (the backend can't match every client's locale formatting).
    */
   private planProposal(userRef: string, amount: string, label: string, before: string, after: string, source: string,
-    stated: boolean): ActionProposal {
+    stated: boolean, payday = false): ActionProposal {
     const proposalId = `pc_${randomUUID().slice(0, 8)}`;
     const payload = { kind: "finance.plan.add", label: label || "Item", amount };
     const hash = payloadHash(payload);
@@ -385,16 +464,25 @@ export class DeterministicFastPath implements AgentBackend {
       capability_id: CAPABILITY_ID,
       kind: "finance.plan.add",
       // The spoken summary never includes untrusted label text.
-      summary: {
-        spoken: { en: "Plan this into this week? Tap to confirm.", fi: "Lisätäänkö tämä viikon suunnitelmaan? Vahvista napauttamalla." },
-        text: {
-          en: `Add ${label ? `“${label}”` : "this"} to this week's planned spending?`,
-          fi: `Lisätäänkö ${label ? `“${label}”` : "tämä"} tämän viikon suunniteltuihin menoihin?`,
-        },
-      },
+      summary: payday
+        ? {
+            spoken: { en: "Plan this in before payday? Tap to confirm.", fi: "Lisätäänkö tämä suunnitelmaan ennen palkkapäivää? Vahvista napauttamalla." },
+            text: {
+              en: `Add ${label ? `“${label}”` : "this"} to your planned spending before payday?`,
+              fi: `Lisätäänkö ${label ? `“${label}”` : "tämä"} suunniteltuihin menoihin ennen palkkapäivää?`,
+            },
+          }
+        : {
+            spoken: { en: "Plan this into this week? Tap to confirm.", fi: "Lisätäänkö tämä viikon suunnitelmaan? Vahvista napauttamalla." },
+            text: {
+              en: `Add ${label ? `“${label}”` : "this"} to this week's planned spending?`,
+              fi: `Lisätäänkö ${label ? `“${label}”` : "tämä"} tämän viikon suunniteltuihin menoihin?`,
+            },
+          },
       details: [
         { label: obs ? { en: "Price (read from the label)", fi: "Hinta (luettu hintalapusta)" } : { en: "Amount", fi: "Summa" }, after: amount },
-        { label: stated ? { en: "Left this week", fi: "Jäljellä tällä viikolla" } : { en: "Safe to spend this week", fi: "Käytettävissä tällä viikolla" }, before, after },
+        { label: payday ? { en: "Free until payday", fi: "Vapaana palkkapäivään asti" }
+            : stated ? { en: "Left this week", fi: "Jäljellä tällä viikolla" } : { en: "Safe to spend this week", fi: "Käytettävissä tällä viikolla" }, before, after },
       ],
       payload_hash: hash,
       risk: "low",
@@ -422,7 +510,7 @@ export class DeterministicFastPath implements AgentBackend {
     this.engine.addPlanned(c.user_ref, { label: held.payload.label, amount: held.payload.amount });
     const appliedAt = new Date();
     // The updated week, so the phone can replace the now-stale answer card.
-    const sts = this.engine.getSafeToSpend(c.user_ref);
+    const sts = await this.engine.getSafeToSpend(c.user_ref);
     return {
       ...base,
       ...(sts ? { card: this.stsCard(sts) } : {}),
@@ -432,4 +520,77 @@ export class DeterministicFastPath implements AgentBackend {
       undo_expires_at: new Date(appliedAt.getTime() + 604800 * 1000).toISOString(),
     };
   }
+}
+
+// ---- Until payday (S-Bank Coach engine, DEC-025) ---------------------------------------------
+
+type PaydaySts = {
+  balance: Money; next_payday: string; days_to_payday: number; reserved: Record<string, Money>;
+  free_until_payday: Money; safe_to_spend_today: Money; planned_total: Money; status: "ok" | "at_risk";
+};
+type PaydayAffordability = {
+  verdict: "FITS" | "TIGHT" | "EXCEEDS" | "UNKNOWN"; remaining_after: Money; free_until_payday: Money;
+  days_to_payday: number; safe_per_day_after: Money;
+};
+
+function isPayday(sts: ToolResult): boolean {
+  return sts.tool === "finance.get_safe_to_spend_until_payday";
+}
+
+/** Spoken numbers stay ones the verifier can trace: "about N" euros (rounded) and the day count. No dates. */
+function paydaySafeToSpendText(sts: ToolResult, l: string): string {
+  const r = sts.result as PaydaySts;
+  const n = roundEuros(r.safe_to_spend_today.amount).toString();
+  const days = String(r.days_to_payday);
+  if (r.status === "at_risk") {
+    return pick(l, {
+      en: `Right now nothing is safe to spend: bills due before payday exceed your balance. Hold off on extra spending for the next ${days} days.`,
+      fi: `Juuri nyt mitään ei ole turvallista käyttää: laskut ennen palkkapäivää ylittävät saldosi. Vältä ylimääräisiä menoja seuraavat ${days} päivää.`,
+    });
+  }
+  if (n === "0") {
+    return pick(l, { en: `Less than a euro a day is safe to spend for the next ${days} days, until payday.`,
+                     fi: `Alle euro päivässä on turvallista käyttää seuraavat ${days} päivää, palkkapäivään asti.` });
+  }
+  return pick(l, {
+    en: `You can safely spend about ${n} euros a day for the next ${days} days, until payday. It's an estimate from your balance and bills.`,
+    fi: `Voit käyttää turvallisesti noin ${n} euroa päivässä seuraavat ${days} päivää, palkkapäivään asti. Arvio perustuu saldoosi ja laskuihin.`,
+  });
+}
+
+function paydayStsCard(sts: ToolResult): InsightCard {
+  const r = sts.result as PaydaySts;
+  const n = roundEuros(r.safe_to_spend_today.amount).toString();
+  const atRisk = r.status === "at_risk";
+  const planned = toCents(r.planned_total.amount) > 0n;
+  return {
+    schema: "platform.insight_card/v1",
+    card_id: `card_${sts.calc_id}`,
+    capability_id: CAPABILITY_ID,
+    type: "metric",
+    title: { en: "Safe to spend today", fi: "Turvallisesti käytettävissä tänään" },
+    primary: { label: { en: "Per day until payday", fi: "Päivässä palkkapäivään asti" }, value: r.safe_to_spend_today, epistemic: "estimate" },
+    ...(atRisk ? { body: { en: "The bills due before payday are more than your balance. Pause extra spending.",
+                           fi: "Ennen palkkapäivää erääntyvät laskut ylittävät saldosi. Pidä taukoa ylimääräisistä menoista." } } : {}),
+    rows: [
+      { label: { en: "Free until payday", fi: "Vapaana palkkapäivään asti" }, value: r.free_until_payday, epistemic: "estimate" },
+      { label: { en: "Balance", fi: "Saldo" }, value: r.balance, epistemic: "fact" },
+      ...(r.reserved.regular_bills_still_due
+        ? [{ label: { en: "Bills still due", fi: "Maksamattomat laskut" }, value: r.reserved.regular_bills_still_due, epistemic: "estimate" as const }]
+        : []),
+      ...(planned ? [{ label: { en: "Already planned", fi: "Jo suunniteltu" }, value: r.planned_total, epistemic: "calculated" as const }] : []),
+      { label: { en: "Days to payday", fi: "Päiviä palkkapäivään" }, value: String(r.days_to_payday), epistemic: "estimate" },
+    ],
+    epistemic: "estimate",
+    ...(sts.data_mode ? { data_mode: sts.data_mode } : {}),
+    basis: { calc_ids: [sts.calc_id as string], as_of: sts.as_of },
+    assumptions: sts.assumptions.map((a) => ({ en: a })),
+    missing_data: [],
+    render_hints: {
+      glasses_display_lines: [atRisk ? "Pause extra spending" : `€${n}/day · ${r.days_to_payday} days to payday`.slice(0, 40), "estimate"],
+      voice_summary: atRisk
+        ? { en: "Nothing is safe to spend before payday.", fi: "Mitään ei ole turvallista käyttää ennen palkkapäivää." }
+        : { en: `About ${n} euros a day until payday.`, fi: `Noin ${n} euroa päivässä palkkapäivään asti.` },
+    },
+  };
 }

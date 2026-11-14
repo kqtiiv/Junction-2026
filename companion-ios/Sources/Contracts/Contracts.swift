@@ -46,6 +46,7 @@ public struct ContractsIndex: Codable {
     public let money: Money?
     public let observation: Observation?
     public let outputDisplay: OutputDisplay?
+    public let paydaySafeToSpendResult: PaydaySafeToSpendResult?
     public let probability: Double?
     public let ref: String?
     public let risk: Risk?
@@ -96,6 +97,7 @@ public struct ContractsIndex: Codable {
         case money = "Money"
         case observation = "Observation"
         case outputDisplay = "OutputDisplay"
+        case paydaySafeToSpendResult = "PaydaySafeToSpendResult"
         case probability = "Probability"
         case ref = "Ref"
         case risk = "Risk"
@@ -107,7 +109,7 @@ public struct ContractsIndex: Codable {
         case voiceIntent = "VoiceIntent"
     }
 
-    public init(actionKind: String?, actionProposal: ActionProposal?, actionResult: ActionResult?, affordabilityResult: AffordabilityResult?, capabilityID: String?, confidence: Risk?, confirmChannel: ConfirmChannel?, contextCapture: ContextCapture?, conversationTurn: ConversationTurn?, dataMode: DataMode?, date: String?, decimalString: String?, deterministicTool: DeterministicTool?, deviceCapability: DeviceCapability?, deviceSessionState: DeviceSessionState?, domainCapability: DomainCapability?, domainEvent: DomainEvent?, domainRequest: DomainRequest?, domainResponse: DomainResponse?, domainResponseEvent: DomainResponseEvent?, epistemic: Epistemic?, errorEnvelope: ErrorEnvelope?, errorInfo: ErrorInfo?, financeActionKind: FinanceActionKind?, financeIntent: FinanceIntent?, financeToolName: FinanceToolName?, glassesInput: GlassesInput?, goldenCase: GoldenCase?, insightCard: InsightCard?, intentID: String?, locale: String?, lText: [String: String]?, mediaURI: String?, missingData: MissingData?, missingDataCode: MissingDataCode?, modelProvider: ModelProvider?, money: Money?, observation: Observation?, outputDisplay: OutputDisplay?, probability: Double?, ref: String?, risk: Risk?, safeToSpendResult: SafeToSpendResult?, sha256: String?, timestamp: Date?, toolResult: ToolResult?, userConfirmation: UserConfirmation?, voiceIntent: VoiceIntent?) {
+    public init(actionKind: String?, actionProposal: ActionProposal?, actionResult: ActionResult?, affordabilityResult: AffordabilityResult?, capabilityID: String?, confidence: Risk?, confirmChannel: ConfirmChannel?, contextCapture: ContextCapture?, conversationTurn: ConversationTurn?, dataMode: DataMode?, date: String?, decimalString: String?, deterministicTool: DeterministicTool?, deviceCapability: DeviceCapability?, deviceSessionState: DeviceSessionState?, domainCapability: DomainCapability?, domainEvent: DomainEvent?, domainRequest: DomainRequest?, domainResponse: DomainResponse?, domainResponseEvent: DomainResponseEvent?, epistemic: Epistemic?, errorEnvelope: ErrorEnvelope?, errorInfo: ErrorInfo?, financeActionKind: FinanceActionKind?, financeIntent: FinanceIntent?, financeToolName: FinanceToolName?, glassesInput: GlassesInput?, goldenCase: GoldenCase?, insightCard: InsightCard?, intentID: String?, locale: String?, lText: [String: String]?, mediaURI: String?, missingData: MissingData?, missingDataCode: MissingDataCode?, modelProvider: ModelProvider?, money: Money?, observation: Observation?, outputDisplay: OutputDisplay?, paydaySafeToSpendResult: PaydaySafeToSpendResult?, probability: Double?, ref: String?, risk: Risk?, safeToSpendResult: SafeToSpendResult?, sha256: String?, timestamp: Date?, toolResult: ToolResult?, userConfirmation: UserConfirmation?, voiceIntent: VoiceIntent?) {
         self.actionKind = actionKind
         self.actionProposal = actionProposal
         self.actionResult = actionResult
@@ -147,6 +149,7 @@ public struct ContractsIndex: Codable {
         self.money = money
         self.observation = observation
         self.outputDisplay = outputDisplay
+        self.paydaySafeToSpendResult = paydaySafeToSpendResult
         self.probability = probability
         self.ref = ref
         self.risk = risk
@@ -217,6 +220,7 @@ public extension ContractsIndex {
         money: Money?? = nil,
         observation: Observation?? = nil,
         outputDisplay: OutputDisplay?? = nil,
+        paydaySafeToSpendResult: PaydaySafeToSpendResult?? = nil,
         probability: Double?? = nil,
         ref: String?? = nil,
         risk: Risk?? = nil,
@@ -267,6 +271,7 @@ public extension ContractsIndex {
             money: money ?? self.money,
             observation: observation ?? self.observation,
             outputDisplay: outputDisplay ?? self.outputDisplay,
+            paydaySafeToSpendResult: paydaySafeToSpendResult ?? self.paydaySafeToSpendResult,
             probability: probability ?? self.probability,
             ref: ref ?? self.ref,
             risk: risk ?? self.risk,
@@ -927,6 +932,14 @@ public enum Value: Codable {
     }
 }
 
+/// remaining_after spread over the days to payday, rounded down to the cent.
+///
+/// Confirmed plans already subtracted from free_until_payday.
+///
+/// Confirmed plans counted against the stated weekly amount this week.
+///
+/// The weekly amount the user said (user_stated source, no bank data). Shown as 'your
+/// figure'.
 // MARK: - Money
 public struct Money: Codable {
     public let amount: String
@@ -1175,34 +1188,52 @@ public enum ActionResultStatus: String, Codable {
 public struct AffordabilityResult: Codable {
     public let amountChecked: Money
     public let category: String?
-    public let differenceVsUsual: Money?
+    public let daysToPayday: Int?
+    public let differenceVsUsual, freeUntilPayday: Money?
+    public let nextPayday: String?
     public let observationID: String?
+    /// What remaining_after covers: this week (fixture, user_stated) or until payday (S-Bank
+    /// Coach engine, DEC-025). Absent means week.
+    public let period: Period?
     /// Where the amount came from. 'observation' = read from a capture; the answer must say the
     /// price was read, not known.
     public let priceSource: PriceSource
-    public let remainingAfter, safeToSpendWeek: Money?
+    public let remainingAfter: Money?
+    /// remaining_after spread over the days to payday, rounded down to the cent.
+    public let safePerDayAfter: Money?
+    public let safeToSpendWeek: Money?
     public let usualWeekMedian: Money?
     public let verdict: Verdict
 
     public enum CodingKeys: String, CodingKey {
         case amountChecked = "amount_checked"
         case category
+        case daysToPayday = "days_to_payday"
         case differenceVsUsual = "difference_vs_usual"
+        case freeUntilPayday = "free_until_payday"
+        case nextPayday = "next_payday"
         case observationID = "observation_id"
+        case period
         case priceSource = "price_source"
         case remainingAfter = "remaining_after"
+        case safePerDayAfter = "safe_per_day_after"
         case safeToSpendWeek = "safe_to_spend_week"
         case usualWeekMedian = "usual_week_median"
         case verdict
     }
 
-    public init(amountChecked: Money, category: String?, differenceVsUsual: Money?, observationID: String?, priceSource: PriceSource, remainingAfter: Money?, safeToSpendWeek: Money?, usualWeekMedian: Money?, verdict: Verdict) {
+    public init(amountChecked: Money, category: String?, daysToPayday: Int?, differenceVsUsual: Money?, freeUntilPayday: Money?, nextPayday: String?, observationID: String?, period: Period?, priceSource: PriceSource, remainingAfter: Money?, safePerDayAfter: Money?, safeToSpendWeek: Money?, usualWeekMedian: Money?, verdict: Verdict) {
         self.amountChecked = amountChecked
         self.category = category
+        self.daysToPayday = daysToPayday
         self.differenceVsUsual = differenceVsUsual
+        self.freeUntilPayday = freeUntilPayday
+        self.nextPayday = nextPayday
         self.observationID = observationID
+        self.period = period
         self.priceSource = priceSource
         self.remainingAfter = remainingAfter
+        self.safePerDayAfter = safePerDayAfter
         self.safeToSpendWeek = safeToSpendWeek
         self.usualWeekMedian = usualWeekMedian
         self.verdict = verdict
@@ -1230,10 +1261,15 @@ public extension AffordabilityResult {
     func with(
         amountChecked: Money? = nil,
         category: String?? = nil,
+        daysToPayday: Int?? = nil,
         differenceVsUsual: Money?? = nil,
+        freeUntilPayday: Money?? = nil,
+        nextPayday: String?? = nil,
         observationID: String?? = nil,
+        period: Period?? = nil,
         priceSource: PriceSource? = nil,
         remainingAfter: Money?? = nil,
+        safePerDayAfter: Money?? = nil,
         safeToSpendWeek: Money?? = nil,
         usualWeekMedian: Money?? = nil,
         verdict: Verdict? = nil
@@ -1241,10 +1277,15 @@ public extension AffordabilityResult {
         return AffordabilityResult(
             amountChecked: amountChecked ?? self.amountChecked,
             category: category ?? self.category,
+            daysToPayday: daysToPayday ?? self.daysToPayday,
             differenceVsUsual: differenceVsUsual ?? self.differenceVsUsual,
+            freeUntilPayday: freeUntilPayday ?? self.freeUntilPayday,
+            nextPayday: nextPayday ?? self.nextPayday,
             observationID: observationID ?? self.observationID,
+            period: period ?? self.period,
             priceSource: priceSource ?? self.priceSource,
             remainingAfter: remainingAfter ?? self.remainingAfter,
+            safePerDayAfter: safePerDayAfter ?? self.safePerDayAfter,
             safeToSpendWeek: safeToSpendWeek ?? self.safeToSpendWeek,
             usualWeekMedian: usualWeekMedian ?? self.usualWeekMedian,
             verdict: verdict ?? self.verdict
@@ -1258,6 +1299,13 @@ public extension AffordabilityResult {
     func jsonString(encoding: String.Encoding = .utf8) throws -> String? {
         return String(data: try self.jsonData(), encoding: encoding)
     }
+}
+
+/// What remaining_after covers: this week (fixture, user_stated) or until payday (S-Bank
+/// Coach engine, DEC-025). Absent means week.
+public enum Period: String, Codable {
+    case untilPayday = "until_payday"
+    case week = "week"
 }
 
 /// Where the amount came from. 'observation' = read from a capture; the answer must say the
@@ -3714,6 +3762,7 @@ public enum FinanceToolName: String, Codable {
     case financeGetBasketBreakdown = "finance.get_basket_breakdown"
     case financeGetCalculation = "finance.get_calculation"
     case financeGetSafeToSpend = "finance.get_safe_to_spend"
+    case financeGetSafeToSpendUntilPayday = "finance.get_safe_to_spend_until_payday"
     case financeGetSavingsProjection = "finance.get_savings_projection"
     case financeGetSpendingSummary = "finance.get_spending_summary"
     case financeGetTransactions = "finance.get_transactions"
@@ -4327,31 +4376,144 @@ public enum ModelProviderStatus: String, Codable {
     case shadow = "shadow"
 }
 
+/// Safe to spend from the S-Bank Coach engine (DEC-025): balance minus what is reserved
+/// until payday, spread over the days to payday. Per day, not per week.
+// MARK: - PaydaySafeToSpendResult
+public struct PaydaySafeToSpendResult: Codable {
+    public let asOfDate: String
+    public let balance: Money
+    public let daysToPayday: Int
+    public let flexibleSpentThisCycle: Money?
+    public let freeUntilPayday: Money
+    public let nextPayday: String
+    /// Confirmed plans already subtracted from free_until_payday.
+    public let plannedTotal: Money
+    /// Money held back until payday. Keys are the engine's reserve names.
+    public let reserved: [String: Money]
+    public let safeToSpendToday: Money
+    /// at_risk: the money reserved for bills exceeds the balance.
+    public let status: PaydaySafeToSpendResultStatus
+
+    public enum CodingKeys: String, CodingKey {
+        case asOfDate = "as_of_date"
+        case balance
+        case daysToPayday = "days_to_payday"
+        case flexibleSpentThisCycle = "flexible_spent_this_cycle"
+        case freeUntilPayday = "free_until_payday"
+        case nextPayday = "next_payday"
+        case plannedTotal = "planned_total"
+        case reserved
+        case safeToSpendToday = "safe_to_spend_today"
+        case status
+    }
+
+    public init(asOfDate: String, balance: Money, daysToPayday: Int, flexibleSpentThisCycle: Money?, freeUntilPayday: Money, nextPayday: String, plannedTotal: Money, reserved: [String: Money], safeToSpendToday: Money, status: PaydaySafeToSpendResultStatus) {
+        self.asOfDate = asOfDate
+        self.balance = balance
+        self.daysToPayday = daysToPayday
+        self.flexibleSpentThisCycle = flexibleSpentThisCycle
+        self.freeUntilPayday = freeUntilPayday
+        self.nextPayday = nextPayday
+        self.plannedTotal = plannedTotal
+        self.reserved = reserved
+        self.safeToSpendToday = safeToSpendToday
+        self.status = status
+    }
+}
+
+// MARK: PaydaySafeToSpendResult convenience initializers and mutators
+
+public extension PaydaySafeToSpendResult {
+    init(data: Data) throws {
+        self = try newJSONDecoder().decode(PaydaySafeToSpendResult.self, from: data)
+    }
+
+    init(_ json: String, using encoding: String.Encoding = .utf8) throws {
+        guard let data = json.data(using: encoding) else {
+            throw NSError(domain: "JSONDecoding", code: 0, userInfo: nil)
+        }
+        try self.init(data: data)
+    }
+
+    init(fromURL url: URL) throws {
+        try self.init(data: try Data(contentsOf: url))
+    }
+
+    func with(
+        asOfDate: String? = nil,
+        balance: Money? = nil,
+        daysToPayday: Int? = nil,
+        flexibleSpentThisCycle: Money?? = nil,
+        freeUntilPayday: Money? = nil,
+        nextPayday: String? = nil,
+        plannedTotal: Money? = nil,
+        reserved: [String: Money]? = nil,
+        safeToSpendToday: Money? = nil,
+        status: PaydaySafeToSpendResultStatus? = nil
+    ) -> PaydaySafeToSpendResult {
+        return PaydaySafeToSpendResult(
+            asOfDate: asOfDate ?? self.asOfDate,
+            balance: balance ?? self.balance,
+            daysToPayday: daysToPayday ?? self.daysToPayday,
+            flexibleSpentThisCycle: flexibleSpentThisCycle ?? self.flexibleSpentThisCycle,
+            freeUntilPayday: freeUntilPayday ?? self.freeUntilPayday,
+            nextPayday: nextPayday ?? self.nextPayday,
+            plannedTotal: plannedTotal ?? self.plannedTotal,
+            reserved: reserved ?? self.reserved,
+            safeToSpendToday: safeToSpendToday ?? self.safeToSpendToday,
+            status: status ?? self.status
+        )
+    }
+
+    func jsonData() throws -> Data {
+        return try newJSONEncoder().encode(self)
+    }
+
+    func jsonString(encoding: String.Encoding = .utf8) throws -> String? {
+        return String(data: try self.jsonData(), encoding: encoding)
+    }
+}
+
+/// at_risk: the money reserved for bills exceeds the balance.
+public enum PaydaySafeToSpendResultStatus: String, Codable {
+    case atRisk = "at_risk"
+    case ok = "ok"
+}
+
 // MARK: - SafeToSpendResult
 public struct SafeToSpendResult: Codable {
     public let daysLeftInWeek: Int
     public let daysToIncome: Int
     public let flexibleUntilPayday: Money
     public let nextIncomeDate: String?
+    /// Confirmed plans counted against the stated weekly amount this week.
+    public let plannedThisWeek: Money?
     public let safeToSpendWeek: Money
     public let shortfall: Money?
+    /// The weekly amount the user said (user_stated source, no bank data). Shown as 'your
+    /// figure'.
+    public let statedWeeklyAmount: Money?
 
     public enum CodingKeys: String, CodingKey {
         case daysLeftInWeek = "days_left_in_week"
         case daysToIncome = "days_to_income"
         case flexibleUntilPayday = "flexible_until_payday"
         case nextIncomeDate = "next_income_date"
+        case plannedThisWeek = "planned_this_week"
         case safeToSpendWeek = "safe_to_spend_week"
         case shortfall
+        case statedWeeklyAmount = "stated_weekly_amount"
     }
 
-    public init(daysLeftInWeek: Int, daysToIncome: Int, flexibleUntilPayday: Money, nextIncomeDate: String?, safeToSpendWeek: Money, shortfall: Money?) {
+    public init(daysLeftInWeek: Int, daysToIncome: Int, flexibleUntilPayday: Money, nextIncomeDate: String?, plannedThisWeek: Money?, safeToSpendWeek: Money, shortfall: Money?, statedWeeklyAmount: Money?) {
         self.daysLeftInWeek = daysLeftInWeek
         self.daysToIncome = daysToIncome
         self.flexibleUntilPayday = flexibleUntilPayday
         self.nextIncomeDate = nextIncomeDate
+        self.plannedThisWeek = plannedThisWeek
         self.safeToSpendWeek = safeToSpendWeek
         self.shortfall = shortfall
+        self.statedWeeklyAmount = statedWeeklyAmount
     }
 }
 
@@ -4378,16 +4540,20 @@ public extension SafeToSpendResult {
         daysToIncome: Int? = nil,
         flexibleUntilPayday: Money? = nil,
         nextIncomeDate: String?? = nil,
+        plannedThisWeek: Money?? = nil,
         safeToSpendWeek: Money? = nil,
-        shortfall: Money?? = nil
+        shortfall: Money?? = nil,
+        statedWeeklyAmount: Money?? = nil
     ) -> SafeToSpendResult {
         return SafeToSpendResult(
             daysLeftInWeek: daysLeftInWeek ?? self.daysLeftInWeek,
             daysToIncome: daysToIncome ?? self.daysToIncome,
             flexibleUntilPayday: flexibleUntilPayday ?? self.flexibleUntilPayday,
             nextIncomeDate: nextIncomeDate ?? self.nextIncomeDate,
+            plannedThisWeek: plannedThisWeek ?? self.plannedThisWeek,
             safeToSpendWeek: safeToSpendWeek ?? self.safeToSpendWeek,
-            shortfall: shortfall ?? self.shortfall
+            shortfall: shortfall ?? self.shortfall,
+            statedWeeklyAmount: statedWeeklyAmount ?? self.statedWeeklyAmount
         )
     }
 

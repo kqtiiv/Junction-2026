@@ -35,6 +35,8 @@ The canonical record of every material decision on the glasses platform and its 
 | [DEC-021](#dec-021--voice-invocation-only-launches-the-app-our-asr-captures-the-question-and-the-router-picks-the-capability-from-the-transcript) | Voice invocation only launches the app; our ASR captures the question and the router picks the capability from the transcript | accepted | glasses |
 | [DEC-022](#dec-022--an-hour-0-device-gate-on-the-real-glasses-sets-the-experimental-feature-flags) | An hour-0 device gate on the real glasses sets the experimental-feature flags | accepted | demo |
 | [DEC-023](#dec-023--capture-turns-get-their-own-latency-budget-the-device-session-stays-warm-the-camera-stream-does-not) | Capture turns get their own latency budget; the device session stays warm, the camera stream does not | accepted | companion |
+| [DEC-024](#dec-024--the-s-bank-coach-teams-python-engine-runs-behind-a-thin-http-service-that-converts-to-our-contracts) | The S-Bank Coach team's Python engine runs behind a thin HTTP service that converts to our contracts | accepted | finance |
+| [DEC-025](#dec-025--money-answers-follow-the-engine-safe-to-spend-today-until-payday-not-per-week) | Money answers follow the engine: safe to spend today, until payday, not per week | accepted | finance |
 
 ---
 
@@ -1322,3 +1324,110 @@ The canonical record of every material decision on the glasses platform and its 
 
 ### Revisit triggers
 - Revisit this decision when hour-0 measurements land (re-baseline), or if stream start exceeds about 2 s (consider the flag-gated standalone photo for the demo).
+
+---
+
+## DEC-024 — The S-Bank Coach team's Python engine runs behind a thin HTTP service that converts to our contracts
+
+- Status: accepted
+- Date: 2026-11-14
+- Owner: platform workstream (service); S-Bank Coach team (engine)
+- Scope: finance
+- Decision:
+  - The team's deterministic engine (`personal-economic-trainer`, `src/engine.py`) is imported unchanged by a small FastAPI service in `finance-engine/`. The service converts engine floats to decimal strings, wraps every result in `platform.tool_result/v1` with a `calc_id`, logs it per user, and serves `GET /v1/calculations/{calc_id}` for the backend's verifier. It records the engine commit and safety buffer on every result.
+
+### Context
+- **Problem being solved:**
+  - The backend answered from a fixture engine (always flagged mock).
+  - The team's real engine is Python (DuckDB, pandas) and returns floats without calculation IDs.
+  - Our contracts require decimal strings and a resolvable `calc_id` on every figure (DEC-019).
+- **Requirements and constraints:**
+  - The engine stays the only source of money values.
+  - We must not edit or commit in the team's repo: its `CLAUDE.md` forbids assistants from committing, and the owner reviews every change.
+- **Assumptions:**
+  - [assumption] The engine's per-customer queries stay under about 1 s (the README says < 1 s for the CLI).
+  - [mock] "Today" is a fixed date inside the synthetic dataset (`FINANCE_AS_OF`, default 2026-09-05).
+- **Non-goals:** real bank connectivity (PSD2); persistence of the calculation log across restarts.
+
+### Options considered
+| Option | Advantages | Disadvantages | Why accepted or rejected |
+|---|---|---|---|
+| HTTP service in our repo that imports the engine unchanged | One conversion point; calculation log; no edits to their repo; testable against our schemas | One more process to run | **Accepted** |
+| Spawn `python engine.py` from the TypeScript backend per call | No extra service | Cold start on each call (loads CSV and parquet); no calculation log | Rejected |
+| Port the engine to TypeScript | One runtime | Two copies of the maths that drift apart; duplicates the team's work | Rejected |
+| Precompute JSON for the demo customers | Most robust on stage | Not live; affordability needs any price | Kept as a fallback idea, not built |
+
+### Evidence and sources
+| Source | Type | Specific finding used | Why this source is trustworthy | Accessed |
+|---|---|---|---|---|
+| S23 `src/engine.py` @ `617172b` (https://github.com/francesco-nicolo/personal-economic-trainer) | Team code | [fact] Five per-customer functions return JSON with floats rounded to 2 decimals and no IDs; one DuckDB connection is shared module-wide | The code itself | 2026-11-14 |
+| S23 `CLAUDE.md` | Team instructions | [fact] "The LLM layer must never do arithmetic: every number shown to a user comes from a function in `src/engine.py`." Assistants must not commit there. | The team's own rule | 2026-11-14 |
+| S22 dataset README (https://github.com/hackjunction/Junction-2026-S-pankki) | Official challenge data | [fact] Transactions include `balance_after_eur`, timestamps, categories and MCC | Organisers' repo | 2026-11-14 |
+
+### Implementation
+- **Components affected:** new `finance-engine/` (`pet_adapter.py`, `server.py`, tests); `backend/src/capabilities/sbank-coach/s-pankki-engine.ts` (`SPankkiFinanceEngine`, the third `FinanceEngine` source; resolves `calc_id`s through the service).
+- **Contracts or schemas affected:** results validate against the finance overlay, with the additive changes in DEC-025.
+- **Configuration / feature flags:** service: `PET_ROOT`, `PET_DATA`, `PET_OUT`, `FINANCE_AS_OF`, `FINANCE_USERS`. Backend: `FINANCE_SOURCE=s_pankki`, `FINANCE_ENGINE_URL`.
+- **Tests or demo checks required:** `finance-engine/test_server.py` (10 tests: no floats, schema-valid envelopes, engine figures unchanged, user-scoped calculation lookup, demo and at-risk customers); `backend/test/s-pankki.test.ts` (6 tests against a fake of the service); one end-to-end run with both services on 2026-11-14.
+- **Migration or rollback plan:** the backend keeps its fixture source; switching back is one setting.
+
+### Consequences
+- **Benefits:** real numbers from S-Pankki's dataset with full provenance; the verifier works unchanged.
+- **Costs and limitations:**
+  - Two figures are computed in the service until the engine has functions for them: the affordability verdict, and the effect of confirmed plans. Both are labelled in `assumptions`.
+  - The calculation log is in memory.
+- **Failure behavior:** service down → `CAPABILITY_UNAVAILABLE`, nothing invented, no silent fallback. A figure the service can't confirm on lookup is dropped by the verifier.
+- **Security/privacy implications:** calculations resolve only for their own `user_ref` (404 otherwise). The dataset is synthetic.
+- **What this intentionally does not solve:** an LLM layer; the engine's own correctness (owned by the team).
+
+### Revisit triggers
+- Revisit this decision when the team adds `affordability(...)` or plan support to the engine (delete the interim code), when the engine is deployed elsewhere, or if call latency exceeds about 1 s.
+
+---
+
+## DEC-025 — Money answers follow the engine: safe to spend today, until payday, not per week
+
+- Status: accepted (2026-11-14, after the `FinanceEngine` seam and the `user_stated` source landed in `8db343d`)
+- Date: 2026-11-14
+- Owner: platform workstream + S-Bank Coach team
+- Scope: finance
+- Decision:
+  - When the S-Pankki engine is the source (`FINANCE_SOURCE=s_pankki`), answers use its semantics: "safe to spend today", "free until payday", and for a purchase, what it leaves per day until payday. The demo opening becomes "Can I afford this?" instead of "Does this fit my week?".
+  - Contracts change additively: a new tool name `finance.get_safe_to_spend_until_payday` with its own result definition, and optional `period`, `free_until_payday`, `days_to_payday`, `next_payday` and `safe_per_day_after` on `AffordabilityResult` (`safe_to_spend_week` is already nullable there).
+
+### Context
+- **Problem being solved:** the platform's answers, cards and contract examples are per week ("€90.16 through Sunday"). The engine computes a daily figure until payday and has no weekly figure.
+- **Requirements and constraints:** no arithmetic outside the engine beyond what DEC-024 labels as interim; additive-only changes within v1.
+- **Assumptions:** [assumption] the in-flight `user_stated` source (weekly amount said by the user) keeps weekly semantics, so both shapes must coexist.
+- **Non-goals:** removing the weekly shape.
+
+### Options considered
+| Option | Advantages | Disadvantages | Why accepted or rejected |
+|---|---|---|---|
+| Use the engine's until-payday semantics; add a new tool result | Numbers are the engine's own; honest | Templates and examples need a second set of wording | **Proposed** |
+| Derive a weekly figure (today × days left in the week) | Keeps current wording | Arithmetic outside the engine; misleading when payday is within the week | Rejected |
+| Ask the team to add a weekly function | Keeps current wording, inside the engine | Their method and backtest are per pay cycle; weeks don't align with paydays | Rejected for now |
+| Move to a v2 finance schema | Clean | Large change during the hackathon | Rejected |
+
+### Evidence and sources
+| Source | Type | Specific finding used | Why this source is trustworthy | Accessed |
+|---|---|---|---|---|
+| S23 `src/engine.py:safe_to_spend`, `docs/method.md` (https://github.com/francesco-nicolo/personal-economic-trainer) | Team code and method | [fact] safe = max(0, (balance − bills still due − irregular reserve − savings − cushion) / days to payday) | The method document | 2026-11-14 |
+| S22 `docs/data-notes.md` in S23, dataset README (https://github.com/hackjunction/Junction-2026-S-pankki) | Challenge data | [fact] Salary mostly lands on the 15th; overdrafts follow the pay cycle | Derived from the official data | 2026-11-14 |
+
+### Implementation
+- **Components affected:** fast-path until-payday wording, cards and plan proposal (`fast-path.ts`, chosen by the result's tool name or `period`); the `FinanceEngine` interface now allows async sources (`Awaitable`); `docs/ARCHITECTURE.md` §6 demo script; READMEs; submission. The companion smoke and UI tests keep the weekly fixture flow, which is still the default.
+- **Contracts or schemas affected:** `finance/finance.schema.json`: `finance.get_safe_to_spend_until_payday`, `PaydaySafeToSpendResult`, optional `period`, `free_until_payday`, `days_to_payday`, `next_payday`, `safe_per_day_after` on `AffordabilityResult` (required together when `period` is `until_payday`). `finance_tool_result.schema.json`: one new typed rule. Three valid examples generated from the real engine (CUST04069; CUST03420 at risk) and three invalid ones (float money, a weekly figure in an until-payday result, missing per-day figure).
+- **Configuration / feature flags:** none beyond DEC-024's `FINANCE_SOURCE`.
+- **Tests or demo checks required:** contract check (passes); backend suite (63 tests, weekly and until-payday shapes). Speech stays within 25 words and never speaks dates, so every number is traceable.
+- **Migration or rollback plan:** the fixture and `user_stated` sources keep the weekly shape.
+
+### Consequences
+- **Benefits:** the spoken numbers are the engine's, backed by its two-year backtest.
+- **Costs and limitations:** two answer shapes (weekly and until payday) in the fast path.
+- **Failure behavior:** unchanged.
+- **Security/privacy implications:** none.
+- **What this intentionally does not solve:** weekly budgeting on bank data.
+
+### Revisit triggers
+- Revisit this decision if the team adds a weekly view or an `affordability()` function to the engine, or if real bank data replaces the simulated date.

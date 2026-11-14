@@ -64,6 +64,7 @@
         "finance.get_transactions",
         "finance.get_basket_breakdown",
         "finance.get_safe_to_spend",
+        "finance.get_safe_to_spend_until_payday",
         "finance.get_upcoming_commitments",
         "finance.simulate_spending_change",
         "finance.get_savings_projection",
@@ -119,6 +120,70 @@
         "planned_this_week": {
           "description": "Confirmed plans counted against the stated weekly amount this week.",
           "$ref": "../common.schema.json#/definitions/Money"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PaydaySafeToSpendResult": {
+      "title": "PaydaySafeToSpendResult",
+      "description": "Safe to spend from the S-Bank Coach engine (DEC-025): balance minus what is reserved until payday, spread over the days to payday. Per day, not per week.",
+      "type": "object",
+      "required": [
+        "as_of_date",
+        "balance",
+        "next_payday",
+        "days_to_payday",
+        "reserved",
+        "free_until_payday",
+        "safe_to_spend_today",
+        "planned_total",
+        "status"
+      ],
+      "properties": {
+        "as_of_date": {
+          "$ref": "../common.schema.json#/definitions/Date"
+        },
+        "balance": {
+          "$ref": "../common.schema.json#/definitions/Money"
+        },
+        "next_payday": {
+          "$ref": "../common.schema.json#/definitions/Date"
+        },
+        "days_to_payday": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "reserved": {
+          "description": "Money held back until payday. Keys are the engine's reserve names.",
+          "type": "object",
+          "maxProperties": 12,
+          "propertyNames": {
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "additionalProperties": {
+            "$ref": "../common.schema.json#/definitions/Money"
+          }
+        },
+        "free_until_payday": {
+          "$ref": "../common.schema.json#/definitions/Money"
+        },
+        "safe_to_spend_today": {
+          "$ref": "../common.schema.json#/definitions/Money"
+        },
+        "flexible_spent_this_cycle": {
+          "$ref": "../common.schema.json#/definitions/Money"
+        },
+        "planned_total": {
+          "description": "Confirmed plans already subtracted from free_until_payday.",
+          "$ref": "../common.schema.json#/definitions/Money"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "ok",
+            "at_risk"
+          ],
+          "description": "at_risk: the money reserved for bills exceeds the balance."
         }
       },
       "additionalProperties": false
@@ -187,23 +252,68 @@
         },
         "difference_vs_usual": {
           "$ref": "../common.schema.json#/definitions/Money"
+        },
+        "period": {
+          "description": "What remaining_after covers: this week (fixture, user_stated) or until payday (S-Bank Coach engine, DEC-025). Absent means week.",
+          "type": "string",
+          "enum": [
+            "week",
+            "until_payday"
+          ]
+        },
+        "free_until_payday": {
+          "$ref": "../common.schema.json#/definitions/Money"
+        },
+        "days_to_payday": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "next_payday": {
+          "$ref": "../common.schema.json#/definitions/Date"
+        },
+        "safe_per_day_after": {
+          "description": "remaining_after spread over the days to payday, rounded down to the cent.",
+          "$ref": "../common.schema.json#/definitions/Money"
         }
       },
-      "if": {
-        "properties": {
-          "price_source": {
-            "const": "observation"
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "price_source": {
+                "const": "observation"
+              }
+            },
+            "required": [
+              "price_source"
+            ]
+          },
+          "then": {
+            "required": [
+              "observation_id"
+            ]
           }
         },
-        "required": [
-          "price_source"
-        ]
-      },
-      "then": {
-        "required": [
-          "observation_id"
-        ]
-      },
+        {
+          "if": {
+            "properties": {
+              "period": {
+                "const": "until_payday"
+              }
+            },
+            "required": [
+              "period"
+            ]
+          },
+          "then": {
+            "required": [
+              "free_until_payday",
+              "days_to_payday",
+              "safe_per_day_after"
+            ]
+          }
+        }
+      ],
       "additionalProperties": false
     }
   }

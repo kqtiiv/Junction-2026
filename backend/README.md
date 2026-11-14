@@ -4,7 +4,7 @@ Implements `contracts/http/orchestrator.openapi.yaml` (L3) and the S-Bank Coach 
 
 ```bash
 npm install
-npm test            # 48 tests: demo path, captures, consent, confirmation rules, abort, timeout fallback, invented numbers
+npm test            # 63 tests: demo path, captures, consent, confirmation rules, abort, timeout fallback, invented numbers
 npm run typecheck
 npm run dev         # http://0.0.0.0:8787  (phone on the same network can reach it)
 ```
@@ -39,6 +39,19 @@ The **label reader is a fixture** too: it returns the demo €79.90 label whatev
 
 Numbers come from `contracts/examples` (€90.16 safe to spend). Every spoken number and card value is verified against the engine's calculation log before it is sent. A remote agent that invents numbers has them dropped (`test/adapter.test.ts`).
 
+## On S-Pankki's data (`FINANCE_SOURCE=s_pankki`)
+
+`SPankkiFinanceEngine` calls `finance-engine/` (the S-Bank Coach team's engine behind an HTTP service, DEC-024) at `FINANCE_ENGINE_URL`. Start that service first (see its README), then `FINANCE_SOURCE=s_pankki npm run dev`.
+
+- **Until payday, not per week** (DEC-025): "safe to spend today", "free until payday", and for a purchase what it leaves per day. Speech never contains dates, only figures the verifier can trace.
+- **Verification goes back to the engine:** `resolve()` calls `GET /v1/calculations/{calc_id}`. If the service can't confirm a figure, the card is dropped.
+- **Every result is validated** against the finance contract before use.
+- **Confirmed plans** are kept here and sent as `planned_total`.
+- **Engine down** → `CAPABILITY_UNAVAILABLE`. Nothing is invented and there is no silent fallback.
+- **Not a mock:** it's the real engine on the challenge's dataset. The simulated date is stated in every result's assumptions.
+
+Tests: `test/s-pankki.test.ts`, run against a fake of the service that serves the contract examples generated from the real engine.
+
 ## Without bank data (`FINANCE_SOURCE=user_stated`)
 
 Built for a lazy user: no setup screen. The first time a question needs money figures, the coach asks one thing out loud and then answers the original question:
@@ -65,6 +78,7 @@ Stating the weekly amount is treated as the user giving information, not as an a
 | Env var | Default | Meaning |
 |---|---|---|
 | `PORT` | `8787` | |
-| `FINANCE_SOURCE` | `fixture` | `fixture`: S-Bank demo numbers (mock). `user_stated`: no bank data; the coach asks for the user's weekly amount once, when first needed |
+| `FINANCE_SOURCE` | `fixture` | `fixture`: S-Bank demo numbers (mock). `user_stated`: no bank data; the coach asks for the user's weekly amount once, when first needed. `s_pankki`: the S-Bank Coach team's engine on S-Pankki's dataset, via `finance-engine/` |
+| `FINANCE_ENGINE_URL` | `http://127.0.0.1:8790` | Where `finance-engine/` listens (`s_pankki` only) |
 | `DEV_TOKENS` | `demo-token:u_7f3a` | Hackathon auth: `token:user_ref,…` |
 | `PLATFORM_SIGNING_KEY_PEM` | ephemeral key | P-256 private key for signing confirmations |

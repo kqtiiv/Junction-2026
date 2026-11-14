@@ -129,6 +129,9 @@ data class ContractsIndex (
     @SerialName("OutputDisplay")
     val outputDisplay: OutputDisplay? = null,
 
+    @SerialName("PaydaySafeToSpendResult")
+    val paydaySafeToSpendResult: PaydaySafeToSpendResult? = null,
+
     @SerialName("Probability")
     val probability: Double? = null,
 
@@ -355,6 +358,16 @@ sealed class Value {
     class StringValue(val value: String) : Value()
 }
 
+/**
+ * remaining_after spread over the days to payday, rounded down to the cent.
+ *
+ * Confirmed plans already subtracted from free_until_payday.
+ *
+ * Confirmed plans counted against the stated weekly amount this week.
+ *
+ * The weekly amount the user said (user_stated source, no bank data). Shown as 'your
+ * figure'.
+ */
 @Serializable
 data class Money (
     val amount: String,
@@ -429,11 +442,26 @@ data class AffordabilityResult (
 
     val category: String? = null,
 
+    @SerialName("days_to_payday")
+    val daysToPayday: Long? = null,
+
     @SerialName("difference_vs_usual")
     val differenceVsUsual: Money? = null,
 
+    @SerialName("free_until_payday")
+    val freeUntilPayday: Money? = null,
+
+    @SerialName("next_payday")
+    val nextPayday: String? = null,
+
     @SerialName("observation_id")
     val observationID: String? = null,
+
+    /**
+     * What remaining_after covers: this week (fixture, user_stated) or until payday (S-Bank
+     * Coach engine, DEC-025). Absent means week.
+     */
+    val period: Period? = null,
 
     /**
      * Where the amount came from. 'observation' = read from a capture; the answer must say the
@@ -445,6 +473,12 @@ data class AffordabilityResult (
     @SerialName("remaining_after")
     val remainingAfter: Money? = null,
 
+    /**
+     * remaining_after spread over the days to payday, rounded down to the cent.
+     */
+    @SerialName("safe_per_day_after")
+    val safePerDayAfter: Money? = null,
+
     @SerialName("safe_to_spend_week")
     val safeToSpendWeek: Money? = null,
 
@@ -453,6 +487,16 @@ data class AffordabilityResult (
 
     val verdict: Verdict
 )
+
+/**
+ * What remaining_after covers: this week (fixture, user_stated) or until payday (S-Bank
+ * Coach engine, DEC-025). Absent means week.
+ */
+@Serializable
+enum class Period(val value: String) {
+    @SerialName("until_payday") UntilPayday("until_payday"),
+    @SerialName("week") Week("week");
+}
 
 /**
  * Where the amount came from. 'observation' = read from a capture; the answer must say the
@@ -1512,6 +1556,7 @@ enum class FinanceToolName(val value: String) {
     @SerialName("finance.get_basket_breakdown") FinanceGetBasketBreakdown("finance.get_basket_breakdown"),
     @SerialName("finance.get_calculation") FinanceGetCalculation("finance.get_calculation"),
     @SerialName("finance.get_safe_to_spend") FinanceGetSafeToSpend("finance.get_safe_to_spend"),
+    @SerialName("finance.get_safe_to_spend_until_payday") FinanceGetSafeToSpendUntilPayday("finance.get_safe_to_spend_until_payday"),
     @SerialName("finance.get_savings_projection") FinanceGetSavingsProjection("finance.get_savings_projection"),
     @SerialName("finance.get_spending_summary") FinanceGetSpendingSummary("finance.get_spending_summary"),
     @SerialName("finance.get_transactions") FinanceGetTransactions("finance.get_transactions"),
@@ -1724,6 +1769,58 @@ enum class ModelProviderStatus(val value: String) {
     @SerialName("shadow") Shadow("shadow");
 }
 
+/**
+ * Safe to spend from the S-Bank Coach engine (DEC-025): balance minus what is reserved
+ * until payday, spread over the days to payday. Per day, not per week.
+ */
+@Serializable
+data class PaydaySafeToSpendResult (
+    @SerialName("as_of_date")
+    val asOfDate: String,
+
+    val balance: Money,
+
+    @SerialName("days_to_payday")
+    val daysToPayday: Long,
+
+    @SerialName("flexible_spent_this_cycle")
+    val flexibleSpentThisCycle: Money? = null,
+
+    @SerialName("free_until_payday")
+    val freeUntilPayday: Money,
+
+    @SerialName("next_payday")
+    val nextPayday: String,
+
+    /**
+     * Confirmed plans already subtracted from free_until_payday.
+     */
+    @SerialName("planned_total")
+    val plannedTotal: Money,
+
+    /**
+     * Money held back until payday. Keys are the engine's reserve names.
+     */
+    val reserved: Map<String, Money>,
+
+    @SerialName("safe_to_spend_today")
+    val safeToSpendToday: Money,
+
+    /**
+     * at_risk: the money reserved for bills exceeds the balance.
+     */
+    val status: PaydaySafeToSpendResultStatus
+)
+
+/**
+ * at_risk: the money reserved for bills exceeds the balance.
+ */
+@Serializable
+enum class PaydaySafeToSpendResultStatus(val value: String) {
+    @SerialName("at_risk") AtRisk("at_risk"),
+    @SerialName("ok") Ok("ok");
+}
+
 @Serializable
 data class SafeToSpendResult (
     @SerialName("days_left_in_week")
@@ -1738,10 +1835,23 @@ data class SafeToSpendResult (
     @SerialName("next_income_date")
     val nextIncomeDate: String? = null,
 
+    /**
+     * Confirmed plans counted against the stated weekly amount this week.
+     */
+    @SerialName("planned_this_week")
+    val plannedThisWeek: Money? = null,
+
     @SerialName("safe_to_spend_week")
     val safeToSpendWeek: Money,
 
-    val shortfall: Money? = null
+    val shortfall: Money? = null,
+
+    /**
+     * The weekly amount the user said (user_stated source, no bank data). Shown as 'your
+     * figure'.
+     */
+    @SerialName("stated_weekly_amount")
+    val statedWeeklyAmount: Money? = null
 )
 
 /**

@@ -1,6 +1,7 @@
-// The finance engine seam (L6). Two data sources implement it:
-//   fixture      seeded from contracts/examples (the S-Bank demo numbers), always a mock;
-//   user_stated  no bank data at all: the user's own weekly amount, asked for once by voice.
+// The finance engine seam (L6). Three data sources implement it:
+//   fixture      seeded from contracts/examples (the S-Bank demo numbers), always a mock; per week;
+//   user_stated  no bank data at all: the user's own weekly amount, asked for once by voice; per week;
+//   s_pankki     the S-Bank Coach team's engine on S-Pankki's dataset, over HTTP (DEC-024); until payday (DEC-025).
 // Later: an open-banking aggregator source behind the same interface.
 import type { ToolResult } from "../../contracts.ts";
 import type { UserScopedCalculationResolver } from "../../sdk/verifier.ts";
@@ -21,15 +22,18 @@ export interface StatedBudget {
   set(userRef: string, amount: string): void;
 }
 
+/** In-process sources answer synchronously; the s_pankki source answers over HTTP. */
+export type Awaitable<T> = T | Promise<T>;
+
 export interface FinanceEngine extends UserScopedCalculationResolver {
-  readonly source: "fixture" | "user_stated";
+  readonly source: "fixture" | "user_stated" | "s_pankki";
   readonly mock: boolean;
   readonly version: string;
   /** Present when the engine needs the user's weekly amount before it can answer. */
   readonly stated?: StatedBudget;
   /** null when the engine lacks the data to answer (e.g. no weekly amount yet). */
-  getSafeToSpend(userRef: string): ToolResult | null;
-  calculateAffordability(userRef: string, input: AffordabilityInput): { result: ToolResult; sts: ToolResult } | null;
+  getSafeToSpend(userRef: string): Awaitable<ToolResult | null>;
+  calculateAffordability(userRef: string, input: AffordabilityInput): Awaitable<{ result: ToolResult; sts: ToolResult } | null>;
   addPlanned(userRef: string, item: Omit<PlannedItem, "plannedAt">): void;
   plannedFor(userRef: string): PlannedItem[];
 }

@@ -1,0 +1,48 @@
+{
+  "schema": "platform.tool_result/v1",
+  "ok": true,
+  "calc_id": "calc_aff_pet_102",
+  "tool": "finance.calculate_affordability",
+  "tool_version": "pet@617172b",
+  "epistemic": "estimate",
+  "data_mode": "balance",
+  "as_of": "2026-09-05T08:00:00+03:00",
+  "result": {
+    "amount_checked": {
+      "amount": "79.90",
+      "currency": "EUR"
+    },
+    "price_source": "observation",
+    "observation_id": "obs_7f2c",
+    "verdict": "FITS",
+    "safe_to_spend_week": null,
+    "remaining_after": {
+      "amount": "240.21",
+      "currency": "EUR"
+    },
+    "period": "until_payday",
+    "free_until_payday": {
+      "amount": "320.11",
+      "currency": "EUR"
+    },
+    "days_to_payday": 10,
+    "next_payday": "2026-09-15"
+  },
+  "assumptions": [
+    "Price read from the shelf label",
+    "Bills still due, irregular reserve and savings are estimated from your previous pay cycles",
+    "Next payday estimated from your usual salary day (2026-09-15)",
+    "Safety buffer: cushion €200, irregular q50",
+    "Simulated date 2026-09-05 on S-Pankki's synthetic Junction 2026 dataset",
+    "Verdict computed outside the engine (interim): fits if at least 25 % of the money free until payday is left, tight if less, exceeds if below zero",
+    "Simulated date 2026-09-05 on S-Pankki's synthetic Junction 2026 dataset"
+  ],
+  "missing_data": [],
+  "warnings": [],
+  "confidence": "medium",
+  "x_engine": {
+    "repo": "personal-economic-trainer",
+    "commit": "617172b",
+    "buffer": "cushion €200, irregular q50"
+  }
+}
