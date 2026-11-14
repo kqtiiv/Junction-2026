@@ -22,6 +22,13 @@ enum MetaMockDevice {
         glasses.powerOn()
         glasses.unfold()
         glasses.don()
+        // The simulated camera streams from a video feed (HEVC only); without one the stream
+        // starts and stops at once. scripts/make-mock-feed.swift renders the label into one.
+        if let feed = Bundle.main.url(forResource: capturedImageName, withExtension: "mp4") {
+            glasses.services.camera.setCameraFeed(fileURL: feed)
+        } else {
+            print("⚠️ No \(capturedImageName).mp4 in the bundle: the simulated camera has no feed")
+        }
         // What capturePhoto(.jpeg) returns. Add a JPEG/PNG with this name to the app target.
         if let url = Bundle.main.url(forResource: capturedImageName, withExtension: "jpg")
             ?? Bundle.main.url(forResource: capturedImageName, withExtension: "png") {

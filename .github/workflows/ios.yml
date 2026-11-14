@@ -54,6 +54,9 @@ jobs:
           for i in $(seq 1 40); do curl -sf localhost:8787/health && exit 0; sleep 1; done
           cat "$RUNNER_TEMP/backend.log"; exit 1
 
+      - name: Render the simulated camera feed (HEVC) for Meta's Mock Device Kit
+        run: swift companion-ios/scripts/make-mock-feed.swift companion-ios/App/Resources/demo_price_label.jpg companion-ios/App/Resources/demo_price_label.mp4
+
       - name: Generate Xcode project
         working-directory: companion-ios/Xcode
         run: |

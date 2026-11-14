@@ -58,7 +58,7 @@ The Xcode project is generated from `Xcode/project.yml` with XcodeGen and has tw
 | `Companion` | The real app for a real iPhone and real glasses. Does **not** link the Mock Device Kit. |
 | `CompanionSim` | Same code plus Meta's Mock Device Kit (`META_MOCK_DEVICE`). Simulated glasses switch on only in the iOS Simulator; the overlay shows `glasses: mock`. Used by the UI test. |
 
-With a Mac: `brew install xcodegen && cd Xcode && xcodegen generate`, open `Companion.xcodeproj`, start the backend (`cd backend && npm run dev`), and run `CompanionSim` in a simulator (iOS 26.x; a third-party wrapper reports issues with the 18.0/18.5 simulators).
+With a Mac: `swift scripts/make-mock-feed.swift App/Resources/demo_price_label.jpg App/Resources/demo_price_label.mp4` (the simulated camera needs an HEVC video feed), then `brew install xcodegen && cd Xcode && xcodegen generate`, open `Companion.xcodeproj`, start the backend (`cd backend && npm run dev`), and run `CompanionSim` in a simulator (iOS 26.x; a third-party wrapper reports issues with the 18.0/18.5 simulators).
 
 ## Commands
 

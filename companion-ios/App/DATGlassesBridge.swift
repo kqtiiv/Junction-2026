@@ -98,7 +98,7 @@ public final class DATGlassesBridge: GlassesBridge {
         case .sdkUpdateRequired: c.yield(.availability(.updateRequired)); c.yield(.degraded(.sdkUpdateRequired))
         default: c.yield(.availability(.available))
         }
-        lock.lock(); let same = observedDevice == id && deviceStateToken != nil; lock.unlock()
+        let same = lock.withLock { observedDevice == id && deviceStateToken != nil }
         if same { return }
         // Hinges closed forces the session to `stopped` (terminal); thermal limits pause it.
         let token = device.addDeviceStateListener { state in
@@ -138,11 +138,11 @@ public final class DATGlassesBridge: GlassesBridge {
         do { s = try Wearables.shared.createSession(deviceSelector: selector) }
         catch { throw GlassesError.unavailable("session: \(error)") }
 
-        lock.lock()
-        generation += 1
-        let gen = generation
-        session = s
-        lock.unlock()
+        let gen: Int = lock.withLock {
+            generation += 1
+            session = s
+            return generation
+        }
 
         let c = continuation
         let stateObserver = Task { [weak self] in
@@ -169,7 +169,7 @@ public final class DATGlassesBridge: GlassesBridge {
                 }
             }
         }
-        lock.lock(); sessionObservers += [stateObserver, errorObserver]; lock.unlock()
+        lock.withLock { sessionObservers += [stateObserver, errorObserver] }
 
         if flags.voiceInvocation { await startVoiceInvocation(deviceID: s.deviceId) }   // register before start
         do { try s.start() } catch { throw GlassesError.unavailable("session start: \(error)") }
@@ -178,7 +178,7 @@ public final class DATGlassesBridge: GlassesBridge {
     }
 
     public func stopSession() async {
-        lock.lock(); let s = session; let gen = generation; lock.unlock()
+        let (s, gen) = lock.withLock { (session, generation) }
         s?.stop()
         // Report `stopped` ourselves: the state observer is cancelled by teardown and may miss it.
         continuation.yield(.session(.stopped))
@@ -188,7 +188,7 @@ public final class DATGlassesBridge: GlassesBridge {
     // MARK: Capture: short stream → capturePhoto(.jpeg) → stop (DEC-006)
 
     public func captureStill() async throws -> Data {
-        lock.lock(); let session = self.session; let existing = camera; lock.unlock()
+        let (session, existing) = lock.withLock { (self.session, camera) }
         guard let session else { throw GlassesError.unavailable("no session") }
 
         var permission = await cameraPermission()
@@ -206,7 +206,7 @@ public final class DATGlassesBridge: GlassesBridge {
             // Medium resolution is the assumed minimum for price labels (DEC-006 [assumption]).
             let config = StreamConfiguration(videoCodec: .raw, resolution: .medium, frameRate: 7)
             guard let added = try? session.addCamera(config: config) else { throw GlassesError.captureFailed("addCamera failed") }
-            lock.lock(); camera = added; lock.unlock()
+            lock.withLock { camera = added }
             cam = added
         }
         let stream = cam.stream
@@ -219,11 +219,17 @@ public final class DATGlassesBridge: GlassesBridge {
         // Subscribe BEFORE starting. Fail fast if the stream stops or pauses after it began
         // (e.g. a touchpad tap pauses it) instead of waiting for the timeout.
         let began = Flag()
+        let lastError = Box<String>()
+        let errorToken = stream.errorPublisher.listen { error in lastError.set("\(error)") }
+        defer { Task { await errorToken.cancel() } }
         let streaming = Waiter(stream.statePublisher) { (state: StreamState) -> Waiter<StreamState>.Decision in
             switch state {
             case .streaming: return .accept(state)
             case .starting, .waitingForDevice: began.set(); return .wait
-            case .stopped, .stopping, .paused: return began.isSet ? .fail(GlassesError.captureFailed("stream \(state)")) : .wait
+            case .stopped, .stopping, .paused:
+                guard began.isSet else { return .wait }
+                let reason = lastError.get().map { "\(state), error: \($0)" } ?? "\(state)"
+                return .fail(GlassesError.captureFailed("stream \(reason)"))
             }
         }
         stream.start()
@@ -282,7 +288,7 @@ public final class DATGlassesBridge: GlassesBridge {
                 }
             }
         }
-        lock.lock(); sessionObservers.append(task); lock.unlock()
+        lock.withLock { sessionObservers.append(task) }
     }
 
     // MARK: Teardown (one point)
@@ -369,6 +375,14 @@ final class Waiter<T: Sendable>: @unchecked Sendable {
         c?.resume(with: r)
         if let t { Task { await t.cancel() } }
     }
+}
+
+/// A thread-safe holder for the last value seen by a @Sendable listener.
+final class Box<T>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value: T?
+    func set(_ v: T) { lock.withLock { value = v } }
+    func get() -> T? { lock.withLock { value } }
 }
 
 /// A thread-safe one-way flag for use inside @Sendable listener closures.
