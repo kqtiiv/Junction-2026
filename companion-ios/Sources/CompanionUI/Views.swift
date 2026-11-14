@@ -128,7 +128,7 @@ public struct ProposalSheet: View {
             HStack {
                 Button("Not now") { onDecide(.reject) }.buttonStyle(.bordered)
                 Spacer()
-                Button("Confirm") { onDecide(.confirm) }.buttonStyle(.borderedProminent)
+                Button("Confirm") { onDecide(.confirm) }.buttonStyle(.borderedProminent).accessibilityIdentifier("confirmProposal")
             }
         }
         .padding(20)
@@ -150,7 +150,7 @@ public struct ConsentView: View {
             Text("Answers are calculated from your data and labelled as facts or estimates. Nothing is bought or paid on your behalf. You can withdraw this permission at any time.")
                 .font(.callout).foregroundStyle(.secondary)
             Spacer()
-            Button("Allow", action: onAllow).buttonStyle(.borderedProminent).frame(maxWidth: .infinity)
+            Button("Allow", action: onAllow).buttonStyle(.borderedProminent).frame(maxWidth: .infinity).accessibilityIdentifier("allowConsent")
         }
         .padding(24)
     }
@@ -173,6 +173,7 @@ struct DebugOverlay: View {
             }
         }
         .font(.caption2.monospaced())
+        .accessibilityIdentifier("debugOverlay")
         .padding(8)
         .background(.black.opacity(0.75), in: RoundedRectangle(cornerRadius: 8))
         .foregroundStyle(.white)
@@ -202,7 +203,7 @@ public struct CompanionScreen: View {
                                 .font(.callout).padding(10).frame(maxWidth: .infinity, alignment: .leading)
                                 .background(.yellow.opacity(0.2), in: RoundedRectangle(cornerRadius: 10))
                         }
-                        if !model.lastSpeech.isEmpty { Text("“\(model.lastSpeech)”").font(.title3) }
+                        if !model.lastSpeech.isEmpty { Text("“\(model.lastSpeech)”").font(.title3).accessibilityIdentifier("lastSpeech") }
                         if let err = model.errorText { Text(err).foregroundStyle(.red) }
                         ForEach(model.cards, id: \.cardID) { CardView(card: $0, locale: locale) }
                     }
@@ -213,11 +214,11 @@ public struct CompanionScreen: View {
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
                         Menu {
-                            Button("Connect glasses") { Task { await model.connectGlasses() } }
+                            Button("Connect glasses") { Task { await model.connectGlasses() } }.accessibilityIdentifier("connectGlasses")
                             Button("Use phone only") { Task { await model.useGlasses(false) } }
                             Toggle("Discreet mode (no amounts spoken)", isOn: $model.discreetMode)
                             Toggle("Debug overlay", isOn: $showDebug)
-                        } label: { Image(systemName: "ellipsis.circle") }
+                        } label: { Image(systemName: "ellipsis.circle") }.accessibilityIdentifier("menu")
                     }
                 }
                 .overlay(alignment: .topLeading) {
@@ -236,7 +237,7 @@ public struct CompanionScreen: View {
         VStack(spacing: 8) {
             if model.listening { Text(model.partial.isEmpty ? "Listening…" : model.partial).foregroundStyle(.secondary) }
             HStack {
-                TextField("Ask about your money", text: $typed).textFieldStyle(.roundedBorder)
+                TextField("Ask about your money", text: $typed).textFieldStyle(.roundedBorder).accessibilityIdentifier("askField")
                     .onSubmit { let t = typed; typed = ""; Task { await model.ask(typed: t) } }
                 Button { model.pushToTalk() } label: {
                     Image(systemName: model.listening ? "waveform" : "mic.fill").font(.title2)

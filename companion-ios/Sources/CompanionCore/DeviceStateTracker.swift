@@ -97,7 +97,9 @@ public final class DeviceStateTracker {
         if session == .stopped || session == .stopping || session == .idle { r.insert(.sessionStopped) }
         // DAT gives no reason for a pause; a long one is most often the glasses taken off.
         if let since = pausedSince, now.timeIntervalSince(since) > Self.pauseLimit { r.insert(.doffed) }
-        if audioRoute == .none || audioRoute == .phone { r.insert(.bluetoothRouteUnavailable) }
+        // Real glasses need the Bluetooth route; simulated glasses (Meta Mock Device Kit or our mock)
+        // have none, so they use the phone's audio. glasses_backend already says `mock`.
+        if backend == .dat && (audioRoute == .none || audioRoute == .phone) { r.insert(.bluetoothRouteUnavailable) }
         if cameraPermission == .denied { r.insert(.cameraPermissionDenied) }
         if micPermissionDenied { r.insert(.micPermissionDenied) }
         if userChosePhone { r.insert(.userChosePhone) }

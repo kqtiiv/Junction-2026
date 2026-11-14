@@ -93,6 +93,15 @@ final class DeviceStateTrackerTests: XCTestCase {
         XCTAssertEqual(snap.seq, 2, "seq is monotonic")
     }
 
+    func testSimulatedGlassesWorkWithPhoneAudio() {
+        let t = DeviceStateTracker(sessionID: "s", bridge: MockGlassesBridge())
+        t.apply(.registration(.registered)); t.apply(.availability(.available)); t.apply(.session(.started))
+        t.audioRoute = .phone // the iOS Simulator has no Bluetooth route
+        let snap = t.snapshot()
+        XCTAssertEqual(snap.mode, .glasses)
+        XCTAssertEqual(snap.glassesBackend, .mock)
+    }
+
     func testStreamOnlyInsideStartedSessionAndCaptureNeedsStream() {
         let t = DeviceStateTracker(sessionID: "s", bridge: MockGlassesBridge())
         t.apply(.registration(.registered)); t.apply(.availability(.available)); t.audioRoute = .glassesHfp

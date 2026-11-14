@@ -1,0 +1,91 @@
+# iOS companion CI on a macOS runner: the team has no Mac, so this is where Swift for iOS
+# gets compiled, and where the app runs in the iOS Simulator against Meta's Mock Device Kit.
+# Screenshots of the UI test are uploaded as an artifact ("ios-screenshots").
+name: iOS companion
+
+on:
+  push:
+    paths: ["companion-ios/**", "backend/**", "contracts/**", ".github/workflows/ios.yml"]
+  workflow_dispatch: {}
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  package:
+    name: Swift package (macOS tests + iOS type-check)
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unit tests (macOS)
+        working-directory: companion-ios
+        run: swift test
+      - name: Type-check iOS-only code (SwiftUI, Speech, AVFoundation) for the simulator
+        working-directory: companion-ios
+        run: |
+          set -o pipefail
+          xcodebuild -scheme CompanionCore-Package -destination 'generic/platform=iOS Simulator' build \
+            | grep -E "error:|warning: .*CompanionUI|BUILD (SUCCEEDED|FAILED)" || true
+          xcodebuild -scheme CompanionCore-Package -destination 'generic/platform=iOS Simulator' build -quiet
+
+  app:
+    name: App + Meta Mock Device Kit UI test
+    needs: package
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+
+      - name: Start backend (fixture data, demo token)
+        working-directory: backend
+        run: |
+          npm ci --no-audit --no-fund
+          nohup npx tsx src/main.ts > "$RUNNER_TEMP/backend.log" 2>&1 &
+          for i in $(seq 1 40); do curl -sf localhost:8787/health && exit 0; sleep 1; done
+          cat "$RUNNER_TEMP/backend.log"; exit 1
+
+      - name: Generate Xcode project
+        working-directory: companion-ios/Xcode
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      - name: Pick the newest available iPhone simulator
+        id: sim
+        run: |
+          UDID=$(xcrun simctl list devices available -j | python3 -c '
+          import sys, json, re
+          devs = json.load(sys.stdin)["devices"]
+          def ver(rt): return [int(x) for x in re.findall(r"\d+", rt.split("iOS-")[-1])] if "iOS" in rt else []
+          for rt in sorted(devs, key=ver, reverse=True):
+              phones = [d for d in devs[rt] if d["name"].startswith("iPhone") and d.get("isAvailable")]
+              if ver(rt) and phones: print(phones[0]["udid"]); break')
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+          xcrun simctl list devices | grep "$UDID"
+
+      - name: Build and run the UI test
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project companion-ios/Xcode/Companion.xcodeproj -scheme Companion \
+            -destination "id=${{ steps.sim.outputs.udid }}" \
+            -resultBundlePath "$RUNNER_TEMP/ui.xcresult" \
+            | grep -vE "^(CompileSwift|SwiftCompile|Ld |CodeSign|ProcessInfoPlist|Copy|Touch|Write|cd |export |    )"
+
+      - name: Export screenshots
+        if: always()
+        run: |
+          mkdir -p "$RUNNER_TEMP/screenshots"
+          xcrun xcresulttool export attachments --path "$RUNNER_TEMP/ui.xcresult" --output-path "$RUNNER_TEMP/screenshots" || true
+          cp "$RUNNER_TEMP/backend.log" "$RUNNER_TEMP/screenshots/" || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-screenshots
+          path: ${{ runner.temp }}/screenshots
+          retention-days: 7

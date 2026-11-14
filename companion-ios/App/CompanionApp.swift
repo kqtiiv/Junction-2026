@@ -23,8 +23,15 @@ struct CompanionApp: App {
             voiceInvocation: info["CompanionFlagVoiceInvocation"] as? Bool ?? false,
             inputs: info["CompanionFlagInputs"] as? Bool ?? false
         )
-        #if canImport(MWDATCore) // VERIFY: the DAT SDK's Swift module name
-        let bridge: GlassesBridge = DATGlassesBridge(flags: flags)
+        #if canImport(MWDATCore)
+        // Simulated glasses (Meta Mock Device Kit) for the iOS Simulator: Info.plist CompanionUseMetaMockDevice = YES.
+        var simulated = false
+        #if DEBUG && canImport(MWDATMockDevice)
+        if info["CompanionUseMetaMockDevice"] as? Bool ?? false {
+            do { try MetaMockDevice.start(); simulated = true } catch { print("⚠️ Mock Device Kit failed: \(error)") }
+        }
+        #endif
+        let bridge: GlassesBridge = DATGlassesBridge(flags: flags, simulated: simulated)
         #else
         // DAT SDK not linked: the mock is used and shown as `glasses: mock` in the overlay (DEC-005).
         print("⚠️ Meta DAT SDK not linked; using MockGlassesBridge")

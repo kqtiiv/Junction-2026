@@ -1,0 +1,104 @@
+# XcodeGen spec for the iOS app, so no one has to create the Xcode project by hand
+# (and CI can build it on a macOS runner).  Generate:  cd companion-ios/Xcode && xcodegen generate
+name: Companion
+options:
+  bundleIdPrefix: dev.junction26
+  deploymentTarget:
+    iOS: "17.2"            # DAT minimum
+  createIntermediateGroups: true
+
+packages:
+  CompanionCore:
+    path: ..               # companion-ios/Package.swift
+  MetaWearablesDAT:
+    url: https://github.com/facebook/meta-wearables-dat-ios
+    exactVersion: 1.0.1    # pinned exactly, like Meta's samples
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+
+targets:
+  Companion:
+    type: application
+    platform: iOS
+    sources:
+      - path: ../App
+    dependencies:
+      - package: CompanionCore
+        product: CompanionCore
+      - package: CompanionCore
+        product: CompanionUI
+      - package: MetaWearablesDAT
+        product: MWDATCore
+      - package: MetaWearablesDAT
+        product: MWDATCamera
+      - package: MetaWearablesDAT
+        product: MWDATInputs
+      - package: MetaWearablesDAT
+        product: MWDATMockDevice     # only used under #if DEBUG
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.junction26.companion
+        # Simulator builds are ad-hoc signed; set DEVELOPMENT_TEAM for a real iPhone.
+        CODE_SIGN_STYLE: Automatic
+        "CODE_SIGN_IDENTITY[sdk=iphonesimulator*]": "-"
+        META_APP_ID: ""          # Developer Center app ID; may stay empty in Developer Mode
+        CLIENT_TOKEN: ""
+    info:
+      path: Info.plist
+      properties:
+        CFBundleDisplayName: S-Bank Coach
+        UILaunchScreen: {}
+        CFBundleURLTypes:
+          - CFBundleURLName: $(PRODUCT_BUNDLE_IDENTIFIER)
+            CFBundleURLSchemes: [sbankcoach]
+        # Meta Wearables Device Access Toolkit (keys as in Meta's CameraAccess sample)
+        MWDAT:
+          AppLinkURLScheme: "sbankcoach://"
+          MetaAppID: $(META_APP_ID)
+          ClientToken: $(CLIENT_TOKEN)
+          TeamID: $(DEVELOPMENT_TEAM)
+          # SDK telemetry off (DEC-015)
+          Analytics: { OptOut: true }
+          CrashReporting: { OptOut: true }
+        UIBackgroundModes: [bluetooth-central, bluetooth-peripheral, audio]
+        NSBluetoothAlwaysUsageDescription: Needed to connect to your Meta AI glasses.
+        NSBluetoothPeripheralUsageDescription: Needed to connect to your Meta AI glasses.
+        NSLocalNetworkUsageDescription: Lets your phone find your glasses and reach the coach on this network.
+        NSBonjourServices: [_bonjour._tcp]
+        NSMicrophoneUsageDescription: So you can ask S-Bank Coach questions by voice.
+        NSSpeechRecognitionUsageDescription: To turn your question into text. Nothing is kept.
+        NSAppTransportSecurity: { NSAllowsLocalNetworking: true }
+        # Companion configuration
+        CompanionBackendURL: http://localhost:8787
+        CompanionDevToken: demo-token
+        CompanionUserRef: u_7f3a
+        CompanionLocale: en-FI
+        CompanionUseMetaMockDevice: true     # simulated glasses in debug builds; set false on a real iPhone
+        CompanionFlagVoiceInvocation: false  # hour-0 device gate (DEC-022)
+        CompanionFlagInputs: false
+
+  CompanionUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: ../UITests
+    dependencies:
+      - target: Companion
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: dev.junction26.companion.uitests
+        "CODE_SIGN_IDENTITY[sdk=iphonesimulator*]": "-"
+        TEST_TARGET_NAME: Companion
+
+schemes:
+  Companion:
+    build:
+      targets:
+        Companion: all
+        CompanionUITests: [test]
+    test:
+      targets: [CompanionUITests]

@@ -20,6 +20,11 @@ export function wire(opts: { tokens?: string; signingKeyPem?: string } = {}) {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
+  if (process.env.NODE_ENV === "production" && (!process.env.DEV_TOKENS || !process.env.PLATFORM_SIGNING_KEY_PEM)) {
+    // Never serve a public URL with the well-known demo token or a key that changes on restart.
+    console.error("Refusing to start: set DEV_TOKENS and PLATFORM_SIGNING_KEY_PEM in production.");
+    process.exit(1);
+  }
   const { keys, registry, tokens } = wire({ tokens: process.env.DEV_TOKENS, signingKeyPem: process.env.PLATFORM_SIGNING_KEY_PEM });
   if (!process.env.DEV_TOKENS) console.warn("DEV_TOKENS not set: using the demo token 'demo-token' for user u_7f3a.");
   if (!process.env.PLATFORM_SIGNING_KEY_PEM) console.warn("PLATFORM_SIGNING_KEY_PEM not set: using an ephemeral signing key.");

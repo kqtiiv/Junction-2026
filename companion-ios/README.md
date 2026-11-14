@@ -47,6 +47,18 @@ companion-ios/
 
 6. Enable Developer Mode for the glasses in the Meta AI app, run on a real iPhone, and do the hour-0 device gate.
 
+## Run without glasses: iOS Simulator + Meta Mock Device Kit
+
+Meta's Mock Device Kit simulates the glasses inside the DAT SDK, so the real `DATGlassesBridge` code runs with no hardware. The SDK's own guide runs its sample this way on the iOS Simulator.
+
+1. Do the one-time setup above, and link the SDK's **`MWDATMockDevice`** product to the app (debug only).
+2. Add `App/MetaMockDevice.swift` to the app target. Optionally add a price-label photo named `demo_price_label.jpg`; it becomes what the glasses "capture" (the fixture label reader reads €79.90 whatever the image shows).
+3. In Info.plist set `CompanionUseMetaMockDevice` = YES and `CompanionBackendURL` = `http://localhost:8787` (the Simulator reaches your Mac's localhost; keep `NSAllowsLocalNetworking`).
+4. On the Mac: `cd backend && npm run dev`. Run the app in an iOS Simulator (iOS 26.x; a wrapper project reports issues with the 18.0/18.5 simulators).
+5. Expect the overlay to show `glasses: mock · mode: glasses`. Simulated glasses use the phone's audio, so no Bluetooth route is required for them (real glasses still require one). Type or hold the mic and ask *"does this fit my week?"* to exercise the capture path.
+
+`MetaMockDevice` also has `tap()`, `takeOff()` and `closeHinges()` for testing gesture confirmation and the phone-only fallback.
+
 ## Commands
 
 ```bash

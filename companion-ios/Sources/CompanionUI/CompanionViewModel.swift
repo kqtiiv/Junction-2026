@@ -38,7 +38,8 @@ public final class CompanionViewModel: ObservableObject {
 
     public func start() async {
         do {
-            _ = await SpeechInput.requestPermissions()
+            // UI tests type their questions; system permission alerts would block them.
+            if !ProcessInfo.processInfo.arguments.contains("-uiTesting") { _ = await SpeechInput.requestPermissions() }
             try await coordinator.start()
             started = true
             await coordinator.setAudioRoute((try? audio.activateHFP()) ?? .phone)
@@ -56,7 +57,8 @@ public final class CompanionViewModel: ObservableObject {
 
     public func connectGlasses() async {
         do {
-            try await coordinator.bridge.startRegistration()
+            // Already registered (e.g. Meta's Mock Device Kit starts registered): don't hand off to the Meta AI app again.
+            if coordinator.tracker?.registration != .registered { try await coordinator.bridge.startRegistration() }
             try await coordinator.bridge.startSession()
             await coordinator.setAudioRoute(audio.currentRoute())
         } catch { show(error) }

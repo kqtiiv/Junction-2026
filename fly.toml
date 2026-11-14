@@ -1,0 +1,31 @@
+# Fly.io deployment of the backend (platform orchestrator + S-Bank Coach adapter).
+# Build context is the repo root; see backend/Dockerfile. Secrets (never in this file):
+#   flyctl secrets set DEV_TOKENS=... PLATFORM_SIGNING_KEY_PEM=...
+app = "junction26-coach"
+primary_region = "arn"   # Stockholm, closest to Helsinki
+
+[build]
+  dockerfile = "backend/Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "8787"
+
+[http_service]
+  internal_port = 8787
+  force_https = true
+  # Always on: a cold start in the middle of a live demo is not acceptable.
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "15s"
+    interval = "30s"
+    timeout = "5s"
+    method = "GET"
+    path = "/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

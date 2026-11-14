@@ -1,0 +1,12 @@
+# Only backend/ and contracts/{schemas,examples,interfaces} are copied; keep the context small.
+.git
+**/node_modules
+**/.build
+**/.swiftpm
+companion-ios
+docs
+contracts/generated
+contracts/.build
+backend/test
+**/.env*
+**/*.pem
