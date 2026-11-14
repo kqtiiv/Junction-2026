@@ -10,7 +10,7 @@ Spendtacles
 
 ## Punchline (max 200)
 
-A finance coach in your Ray-Ban Meta glasses: look at a price, ask "can I afford this?", and hear an answer built on numbers you can check. Nothing changes without your OK.
+Save money before you spend it. Look at a price through your Ray-Ban Meta glasses, ask "can I afford this?", and hear what it would leave you, from numbers you can check.
 
 ## Challenge
 

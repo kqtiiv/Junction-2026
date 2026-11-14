@@ -1,8 +1,12 @@
 # Spendtacles
 
-**A finance coach in your Ray-Ban Meta glasses.** Look at a price, ask *"Can I afford this?"* (or *"Onko minulla varaa tähän?"*), and hear an answer built on numbers you can check. Nothing changes without your OK.
+## Save money before you spend it.
 
-Spendtacles is a glasses platform with one stable capability interface, and the money coach is the first capability that plugs into it. Built for Junction 2026, challenge *AI Glasses for Everyone, Everyday*.
+Spendtacles puts a money coach in your Ray-Ban Meta glasses. Look at a price, ask *"Can I afford this?"* (or *"Onko minulla varaa tähän?"*), and hear what buying it would leave you to live on, while the item is still on the shelf. Nothing changes without your OK.
+
+**Why glasses.** Money decisions happen in the shop aisle, not in the banking app. By the time you open an app to check your budget, you've already paid. Spendtacles answers at the moment you decide, so you can put it back before it costs you.
+
+Under the hood, Spendtacles is a glasses platform with one stable capability interface, and the money coach is the first capability that plugs into it. Built for Junction 2026, challenge *AI Glasses for Everyone, Everyday*.
 
 ## The demo flow
 
@@ -59,6 +63,57 @@ The answers come from our teammate's deterministic money engine, run on the Junc
 - The dataset is synthetic history, so "today" is a fixed simulated date (2026-09-05). Every result says so.
 - The demo customer is CUST04069. A customer whose bills exceed their balance is told plainly that nothing is safe to spend.
 - We are still confirming with the organisers that teams outside the S-Pankki challenge may use this dataset. If not, `user_stated` becomes the demo source (DEC-026).
+
+#### How the money engine works
+
+The engine (*Personal Economic Trainer*, in our teammate's private repo) reads a customer's transaction history and works out, with plain arithmetic, how much is safe to spend. There is no AI inside it: the same data always gives the same answer, and every step can be checked.
+
+**1. It sorts every transaction into three groups.**
+
+| Group | Examples | Meaning |
+|---|---|---|
+| Must-pay, regular | Rent, utilities, groceries, commuting | Arrives every month, roughly the same amount |
+| Must-pay, irregular | Health, home and tech | Unavoidable, but lumpy |
+| Flexible | Restaurants, entertainment, shopping, taxis | The money that slips through your fingers |
+
+**2. It finds the pay cycle.** It learns from history when salary usually lands (in this dataset, mostly on the 15th), so it knows how many days are left until payday.
+
+**3. It works out what is safe to spend today.** With the demo customer's real numbers:
+
+```
+  Balance right now                          €1,374.22
+− Bills still due before payday               −€626.30   (typical cycle, last 6 pay cycles)
+− Reserve for surprise must-pay costs         −€227.81   (from the last 12 pay cycles)
+− Savings they usually move                     −€0.00
+− Safety cushion                              −€200.00
+= Free until payday                             €320.11
+÷ 10 days to payday
+= Safe to spend today                       €32.01 a day
+```
+
+A €79.90 purchase then leaves €240.21, or **€24.02 a day**, which is what the glasses say. The rule corrects itself every day: spend less today and tomorrow's figure goes up.
+
+**4. The safety buffer was tested, not guessed.** The team compared cushion and reserve settings on the first year of data, then checked the winner on the second year, which it had never seen. The chosen setting (a €200 cushion plus a typical-month reserve) prevented more overdrafts *and* made people wait less to spend than the original setting.
+
+**5. Results.** These come from the team's two-year backtest on 5,000 customers. They are the team's own figures; the platform side has not re-run them.
+
+- **89 % fewer overdraft days** when people follow the daily limit.
+- **94 % fewer** when combined with a savings plan.
+- **No overfitting:** settings chosen on year 1 held up on year 2.
+- **An honest finding:** advice only works if it's followed. At 75 % compliance, the gain drops sharply.
+
+**It can do more than the demo shows:**
+
+- **A savings plan** that splits a goal (for example 5 % of income) across spending categories, cutting most where you spend far more than people of your age and income.
+- **An overdraft risk estimate**, by replaying your past months as scenarios to estimate the chance of going below zero before payday.
+
+**How it connects to the glasses.** [`finance-engine/`](finance-engine/README.md) imports the engine unchanged and does three things:
+
+- turns each figure into an exact decimal string (`"32.01"`), never a floating-point number;
+- gives each result a receipt (a `calc_id`) and logs it;
+- lets the backend look each receipt up before anything is spoken. A number missing from the log is dropped.
+
+Two figures are still computed by that service rather than the engine: the fits / tight / doesn't-fit verdict, and how a confirmed plan reduces the money left. Each result says so in its assumptions.
 
 ### Fixture (`fixture`, the default)
 
