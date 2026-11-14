@@ -1,0 +1,20 @@
+{
+  "schema": "platform.observation/v1",
+  "observation_id": "obs_31",
+  "capture_id": "cap_8Hk2",
+  "kind": "price_label",
+  "epistemic": "observed",
+  "extractor": { "provider_id": "ocr.cloud", "version": "2026-11" },
+  "items": [
+    {
+      "label_untrusted": "LANGATTOMAT KUULOKKEET",
+      "price": { "amount": "79.90", "currency": "EUR" },
+      "barcode": "6410405123458",
+      "confidence": 0.91
+    }
+  ],
+  "raw_text_untrusted": "LANGATTOMAT KUULOKKEET\n79,90\n6410405123458",
+  "needs_user_check": false,
+  "issues": [],
+  "created_at": "2026-11-19T17:52:06+02:00"
+}

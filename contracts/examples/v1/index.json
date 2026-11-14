@@ -1,0 +1,231 @@
+{
+  "cases": [
+    {
+      "file": "valid/context_capture.price_label.json",
+      "schema": "context_capture.schema.json",
+      "valid": true
+    },
+    {
+      "file": "valid/observation.price_label.json",
+      "schema": "observation.schema.json",
+      "valid": true
+    },
+    {
+      "file": "valid/voice_intent.hey_meta_with_capture.json",
+      "schema": "voice_intent.schema.json",
+      "valid": true
+    },
+    {
+      "file": "valid/voice_intent.gesture_confirm.json",
+      "schema": "voice_intent.schema.json",
+      "valid": true
+    },
+    {
+      "file": "valid/finance/manifest.sbank_coach.json",
+      "schema": "capability_manifest.schema.json",
+      "valid": true
+    },
+    {
+      "file": "valid/finance/manifest.sbank_coach.json",
+      "schema": "finance/finance_manifest.schema.json",
+      "valid": true
+    },
+    {
+      "file": "valid/domain_request.affordability_observed.json",
+      "schema": "domain_request.schema.json",
+      "valid": true
+    },
+    {
+      "file": "valid/finance/tool_result.safe_to_spend.json",
+      "schema": "finance/finance_tool_result.schema.json",
+      "valid": true
+    },
+    {
+      "file": "valid/finance/tool_result.affordability_observed.json",
+      "schema": "finance/finance_tool_result.schema.json",
+      "valid": true
+    },
+    {
+      "file": "valid/finance/tool_result.affordability_pace_mode.json",
+      "schema": "finance/finance_tool_result.schema.json",
+      "valid": true
+    },
+    {
+      "file": "valid/tool_descriptor.calculate_affordability.json",
+      "schema": "tool_descriptor.schema.json",
+      "valid": true
+    },
+    {
+      "file": "valid/insight_card.affordability.json",
+      "schema": "insight_card.schema.json",
+      "valid": true
+    },
+    {
+      "file": "valid/action_proposal.plan_add.json",
+      "schema": "action_proposal.schema.json",
+      "valid": true
+    },
+    {
+      "file": "valid/user_confirmation.glasses_gesture.json",
+      "schema": "user_confirmation.schema.json",
+      "valid": true
+    },
+    {
+      "file": "valid/user_confirmation.phone_tap.json",
+      "schema": "user_confirmation.schema.json",
+      "valid": true
+    },
+    {
+      "file": "valid/action_result.applied.json",
+      "schema": "action_result.schema.json",
+      "valid": true
+    },
+    {
+      "file": "valid/domain_response_event.progress.json",
+      "schema": "domain_response_event.schema.json",
+      "valid": true
+    },
+    {
+      "file": "valid/domain_response_event.final.json",
+      "schema": "domain_response_event.schema.json",
+      "valid": true
+    },
+    {
+      "file": "valid/domain_event.allowance_low.json",
+      "schema": "domain_event.schema.json",
+      "valid": true
+    },
+    {
+      "file": "valid/model_provider.asr_device.json",
+      "schema": "model_provider.schema.json",
+      "valid": true
+    },
+    {
+      "file": "valid/model_provider.router_local_shadow.json",
+      "schema": "model_provider.schema.json",
+      "valid": true
+    },
+    {
+      "file": "valid/golden_case.affordability_observed.json",
+      "schema": "golden_case.schema.json",
+      "valid": true
+    },
+    {
+      "file": "valid/golden_case.pace_mode_no_verdict.json",
+      "schema": "golden_case.schema.json",
+      "valid": true
+    },
+    {
+      "file": "valid/domain_response.affordability_observed.json",
+      "schema": "domain_response.schema.json",
+      "valid": true
+    },
+    {
+      "file": "valid/finance/tool_result.safe_to_spend.json",
+      "schema": "tool_result.schema.json",
+      "valid": true
+    },
+    {
+      "file": "invalid/insight_card.float_money.json",
+      "schema": "insight_card.schema.json",
+      "valid": false,
+      "reason": "Money must be a decimal string, never a JSON number"
+    },
+    {
+      "file": "invalid/action_proposal.payment_kind.json",
+      "schema": "action_proposal.schema.json",
+      "valid": false,
+      "reason": "Action kinds that move money are forbidden"
+    },
+    {
+      "file": "invalid/action_proposal.gesture_on_medium_risk.json",
+      "schema": "action_proposal.schema.json",
+      "valid": false,
+      "reason": "Gesture/voice confirmation only allowed for low-risk reversible actions"
+    },
+    {
+      "file": "invalid/action_proposal.high_risk_without_biometric.json",
+      "schema": "action_proposal.schema.json",
+      "valid": false,
+      "reason": "High-risk actions require phone_biometric only"
+    },
+    {
+      "file": "invalid/user_confirmation.voice_low_confidence.json",
+      "schema": "user_confirmation.schema.json",
+      "valid": false,
+      "reason": "Voice confirmation needs ASR confidence >= 0.85"
+    },
+    {
+      "file": "invalid/user_confirmation.gesture_without_readback.json",
+      "schema": "user_confirmation.schema.json",
+      "valid": false,
+      "reason": "Gesture confirmation requires the summary to have been read back"
+    },
+    {
+      "file": "invalid/insight_card.estimate_without_calc_id.json",
+      "schema": "insight_card.schema.json",
+      "valid": false,
+      "reason": "Estimated cards must cite at least one calc_id"
+    },
+    {
+      "file": "invalid/context_capture.exif_not_stripped.json",
+      "schema": "context_capture.schema.json",
+      "valid": false,
+      "reason": "Captures must have EXIF stripped before upload"
+    },
+    {
+      "file": "invalid/tool_result.success_without_calc_id.json",
+      "schema": "tool_result.schema.json",
+      "valid": false,
+      "reason": "Successful results about the user's data must carry a calc_id"
+    },
+    {
+      "file": "invalid/finance_tool_result.pace_mode_with_verdict.json",
+      "schema": "finance/finance_tool_result.schema.json",
+      "valid": false,
+      "reason": "Pace mode cannot answer affordability with yes/no"
+    },
+    {
+      "file": "invalid/finance_tool_result.estimate_without_data_mode.json",
+      "schema": "finance/finance_tool_result.schema.json",
+      "valid": false,
+      "reason": "Finance estimates must state their data mode"
+    },
+    {
+      "file": "invalid/finance_manifest.retention_90_days.json",
+      "schema": "finance/finance_manifest.schema.json",
+      "valid": false,
+      "reason": "Capture retention is capped at 30 days"
+    },
+    {
+      "file": "invalid/finance_manifest.transfer_action.json",
+      "schema": "finance/finance_manifest.schema.json",
+      "valid": false,
+      "reason": "Manifests cannot declare money-moving action kinds"
+    },
+    {
+      "file": "invalid/domain_event.spoken_amounts.json",
+      "schema": "domain_event.schema.json",
+      "valid": false,
+      "reason": "Amounts are never spoken proactively"
+    },
+    {
+      "file": "invalid/domain_response_event.verified_with_unverified_value.json",
+      "schema": "domain_response_event.schema.json",
+      "valid": false,
+      "reason": "A response marked verified cannot contain unverified values"
+    },
+    {
+      "file": "invalid/model_provider.device_leaks_data.json",
+      "schema": "model_provider.schema.json",
+      "valid": false,
+      "reason": "On-device providers cannot send data off the device"
+    },
+    {
+      "file": "invalid/voice_intent.spoken_without_transcript.json",
+      "schema": "voice_intent.schema.json",
+      "valid": false,
+      "reason": "Spoken turns must carry a transcript"
+    }
+  ]
+}

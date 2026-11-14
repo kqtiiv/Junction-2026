@@ -1,0 +1,13 @@
+{
+  "schema": "platform.user_confirmation/v1",
+  "confirmation_id": "uc_78",
+  "proposal_id": "pc_19",
+  "payload_hash": "sha256:df53b0e7e7ce796a3408502e536e8a83c225bb73f40124ff0ba723492f417e2a",
+  "decision": "confirm",
+  "channel": "phone_tap",
+  "evidence": { "readback_played": true, "ui_event_id": "ui_9921" },
+  "user_ref": "u_7f3a",
+  "session_id": "ses_41",
+  "confirmed_at": "2026-11-19T17:58:40+02:00",
+  "signature": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBsYXRmb3JtLTEifQ.eyJwcm9wb3NhbF9pZCI6InBjXzE5In0.ZmFrZS1zaWduYXR1cmUtZm9yLWV4YW1wbGU"
+}

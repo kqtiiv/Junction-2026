@@ -1,0 +1,24 @@
+{
+  "schema": "platform.context_capture/v1",
+  "capture_id": "cap_8Hk2",
+  "session_id": "ses_41",
+  "user_ref": "u_7f3a",
+  "source": "glasses_photo",
+  "trigger": "voice_command",
+  "purpose": "price_label",
+  "media": {
+    "kind": "image",
+    "mime": "image/jpeg",
+    "width": 1600,
+    "height": 1200,
+    "sha256": "sha256:3c4ed0c1cc7febce9932994f69eabdf4de52a60a516b4a598c905cf175c87b5f",
+    "uri": "media://ephemeral/cap_8Hk2",
+    "expires_at": "2026-11-19T18:12:04+02:00"
+  },
+  "minimisation": [
+    "downscaled"
+  ],
+  "consent_grant_id": "cg_camera_01",
+  "captured_at": "2026-11-19T17:52:04+02:00",
+  "locale": "fi-FI"
+}

@@ -1,0 +1,60 @@
+{
+  "schema": "platform.golden_case/v1",
+  "case_id": "fin_aff_pace_01",
+  "capability_id": "sbank.coach",
+  "description": "Same question with no balance or income in the data: must not say yes/no, must say what is missing.",
+  "tags": [
+    "degraded",
+    "capture"
+  ],
+  "persona": "personas/aino_no_balance.json",
+  "today": "2026-11-19T17:52:00+02:00",
+  "locale": "en-FI",
+  "input": {
+    "utterance": "does this fit my week",
+    "observations": [
+      {
+        "schema": "platform.observation/v1",
+        "observation_id": "obs_31",
+        "capture_id": "cap_8Hk2",
+        "kind": "price_label",
+        "epistemic": "observed",
+        "extractor": {
+          "provider_id": "fixture",
+          "version": "1"
+        },
+        "items": [
+          {
+            "label_untrusted": "LANGATTOMAT KUULOKKEET",
+            "price": {
+              "amount": "79.90",
+              "currency": "EUR"
+            },
+            "confidence": 0.91
+          }
+        ],
+        "needs_user_check": false,
+        "issues": [],
+        "created_at": "2026-11-19T17:52:06+02:00"
+      }
+    ]
+  },
+  "expected": {
+    "status": "answered",
+    "intent": "finance.basket.affordability",
+    "tools": [
+      "finance.calculate_affordability"
+    ],
+    "values": {
+      "result.verdict": "UNKNOWN",
+      "result.usual_week_median.amount": "142.30"
+    },
+    "epistemic": "estimate",
+    "data_mode": "pace",
+    "speech_max_words": 30,
+    "speech_must_mention": [
+      "NO_BALANCE",
+      "PRICE_IS_OBSERVED"
+    ]
+  }
+}

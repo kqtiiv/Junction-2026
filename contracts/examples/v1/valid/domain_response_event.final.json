@@ -1,0 +1,66 @@
+{
+  "type": "final",
+  "response": {
+    "schema": "platform.domain_response/v1",
+    "request_id": "req_5521",
+    "status": "answered",
+    "speech": {
+      "text": "If that price is 79.90, it fits, but it would leave about ten euros until Sunday. Want me to plan it in?",
+      "epistemic": "estimate"
+    },
+    "cards": [
+      {
+        "schema": "platform.insight_card/v1",
+        "card_id": "card_aff_40",
+        "capability_id": "sbank.coach",
+        "type": "metric",
+        "title": { "en": "Does it fit this week?" },
+        "primary": {
+          "label": { "en": "Left until Sunday after buying" },
+          "value": { "amount": "10.26", "currency": "EUR" },
+          "epistemic": "estimate"
+        },
+        "rows": [
+          { "label": { "en": "Price on the label" }, "value": { "amount": "79.90", "currency": "EUR" }, "epistemic": "observed" },
+          { "label": { "en": "Safe to spend Thu–Sun" }, "value": { "amount": "90.16", "currency": "EUR" }, "epistemic": "estimate" }
+        ],
+        "epistemic": "estimate",
+        "data_mode": "balance",
+        "basis": { "calc_ids": ["calc_aff_40", "calc_sts_91"], "observation_ids": ["obs_31"], "as_of": "2026-11-19T17:52:07+02:00" },
+        "assumptions": [{ "en": "Electricity bill estimated at €38.00" }],
+        "missing_data": [],
+        "proposal_ids": ["pc_20"]
+      }
+    ],
+    "proposals": [
+      {
+        "schema": "platform.action_proposal/v1",
+        "proposal_id": "pc_20",
+        "capability_id": "sbank.coach",
+        "kind": "finance.plan.add",
+        "summary": {
+          "spoken": { "en": "Plan the headphones into this week? Tap to confirm." },
+          "text": { "en": "Add 'Wireless headphones' (€79.90, read from label) to this week's planned spending" }
+        },
+        "details": [{ "label": { "en": "Safe to spend after" }, "before": "90.16", "after": "10.26" }],
+        "payload_hash": "sha256:2da319cf93738b41bc99832c1e947848d35973b68e76b65ff811f2b876ef1624",
+        "risk": "low",
+        "reversible": true,
+        "confirm_channels": ["phone_tap", "glasses_gesture", "voice_readback"],
+        "expires_at": "2026-11-19T18:22:07+02:00"
+      }
+    ],
+    "followups": [{ "en": "What else is coming up this week?" }],
+    "trace": {
+      "calc_ids": ["calc_aff_40", "calc_sts_91"],
+      "observation_ids": ["obs_31"],
+      "tools": [
+        { "name": "finance.get_safe_to_spend", "ok": true, "ms": 84 },
+        { "name": "finance.calculate_affordability", "ok": true, "ms": 61 }
+      ],
+      "backend": "remote_agent@0.4",
+      "verified": true,
+      "verification": { "checked_values": 4, "unverified": [] }
+    }
+  }
+}

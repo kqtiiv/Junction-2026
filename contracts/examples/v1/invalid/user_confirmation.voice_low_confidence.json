@@ -1,0 +1,17 @@
+{
+  "schema": "platform.user_confirmation/v1",
+  "confirmation_id": "uc_77",
+  "proposal_id": "pc_20",
+  "payload_hash": "sha256:2da319cf93738b41bc99832c1e947848d35973b68e76b65ff811f2b876ef1624",
+  "decision": "confirm",
+  "channel": "voice_readback",
+  "evidence": {
+    "readback_played": true,
+    "utterance": "confirm",
+    "asr_confidence": 0.62
+  },
+  "user_ref": "u_7f3a",
+  "session_id": "ses_41",
+  "confirmed_at": "2026-11-19T17:52:19+02:00",
+  "signature": "eyJhbGciOiJFUzI1NiIsImtpZCI6InBsYXRmb3JtLTEifQ.eyJwcm9wb3NhbF9pZCI6InBjXzIwIn0.ZmFrZS1zaWduYXR1cmUtZm9yLWV4YW1wbGU"
+}

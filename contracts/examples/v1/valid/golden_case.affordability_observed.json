@@ -1,0 +1,43 @@
+{
+  "schema": "platform.golden_case/v1",
+  "case_id": "fin_aff_observed_01",
+  "capability_id": "sbank.coach",
+  "description": "User looks at a price label and asks if it fits the week; balance mode; verdict TIGHT.",
+  "tags": ["golden", "capture"],
+  "persona": "personas/aino.json",
+  "today": "2026-11-19T17:52:00+02:00",
+  "locale": "en-FI",
+  "input": {
+    "utterance": "does this fit my week",
+    "observations": [
+      {
+        "schema": "platform.observation/v1",
+        "observation_id": "obs_31",
+        "capture_id": "cap_8Hk2",
+        "kind": "price_label",
+        "epistemic": "observed",
+        "extractor": { "provider_id": "fixture", "version": "1" },
+        "items": [{ "label_untrusted": "LANGATTOMAT KUULOKKEET", "price": { "amount": "79.90", "currency": "EUR" }, "confidence": 0.91 }],
+        "needs_user_check": false,
+        "issues": [],
+        "created_at": "2026-11-19T17:52:06+02:00"
+      }
+    ]
+  },
+  "expected": {
+    "status": "answered",
+    "intent": "finance.basket.affordability",
+    "tools": ["finance.calculate_affordability"],
+    "values": {
+      "result.amount_checked.amount": "79.90",
+      "result.safe_to_spend_week.amount": "90.16",
+      "result.remaining_after.amount": "10.26",
+      "result.verdict": "TIGHT"
+    },
+    "epistemic": "estimate",
+    "data_mode": "balance",
+    "speech_max_words": 25,
+    "speech_must_mention": ["PRICE_IS_OBSERVED", "ESTIMATE"],
+    "proposal_kinds": ["finance.plan.add"]
+  }
+}

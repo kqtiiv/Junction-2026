@@ -1,0 +1,150 @@
+{
+  "schema": "platform.capability_manifest/v1",
+  "capability_id": "sbank.coach",
+  "version": "0.4.0",
+  "contract_version": "1",
+  "display_name": {
+    "en": "S-Bank Coach",
+    "fi": "S-Bank Valmentaja",
+    "sv": "S-Bank Coach"
+  },
+  "intents": [
+    {
+      "id": "finance.safe_to_spend",
+      "voice_ok": true,
+      "accepts_capture": [],
+      "examples": [
+        {
+          "en": "what's safe to spend this week",
+          "fi": "paljonko voin käyttää tällä viikolla"
+        }
+      ]
+    },
+    {
+      "id": "finance.basket.affordability",
+      "voice_ok": true,
+      "accepts_capture": [
+        "price_label"
+      ],
+      "examples": [
+        {
+          "en": "does this fit my week",
+          "fi": "mahtuuko tämä viikon budjettiin"
+        }
+      ]
+    },
+    {
+      "id": "finance.spend.query",
+      "voice_ok": true,
+      "accepts_capture": [],
+      "examples": [
+        {
+          "en": "how much did I spend on taxis last month",
+          "fi": "paljonko käytin takseihin viime kuussa"
+        }
+      ]
+    },
+    {
+      "id": "finance.receipt.scan",
+      "voice_ok": true,
+      "accepts_capture": [
+        "receipt"
+      ],
+      "examples": [
+        {
+          "en": "scan this receipt",
+          "fi": "skannaa tämä kuitti"
+        }
+      ]
+    }
+  ],
+  "capture_purposes": [
+    {
+      "purpose": "price_label",
+      "delivery": "observation",
+      "retention_max_s": 0
+    },
+    {
+      "purpose": "receipt",
+      "delivery": "media",
+      "retention_max_s": 604800
+    }
+  ],
+  "data_classes": [
+    "financial_transactions",
+    "purchase_items",
+    "receipt_images",
+    "observed_prices"
+  ],
+  "action_kinds": [
+    {
+      "kind": "finance.plan.add",
+      "risk": "low",
+      "reversible": true,
+      "confirm_channels": [
+        "phone_tap",
+        "glasses_gesture",
+        "voice_readback"
+      ]
+    },
+    {
+      "kind": "finance.classification.update",
+      "risk": "low",
+      "reversible": true,
+      "confirm_channels": [
+        "phone_tap",
+        "glasses_gesture",
+        "voice_readback"
+      ]
+    },
+    {
+      "kind": "finance.receipt.link",
+      "risk": "low",
+      "reversible": true,
+      "confirm_channels": [
+        "phone_tap",
+        "glasses_gesture",
+        "voice_readback"
+      ]
+    },
+    {
+      "kind": "finance.settings.buffer.update",
+      "risk": "medium",
+      "reversible": true,
+      "confirm_channels": [
+        "phone_tap"
+      ]
+    },
+    {
+      "kind": "finance.data.delete",
+      "risk": "high",
+      "reversible": false,
+      "confirm_channels": [
+        "phone_biometric"
+      ]
+    },
+    {
+      "kind": "finance.transfer.savings",
+      "risk": "medium",
+      "reversible": true,
+      "confirm_channels": [
+        "phone_tap"
+      ]
+    }
+  ],
+  "events_emitted": [
+    "finance.weekly_allowance.low",
+    "finance.bill.upcoming",
+    "finance.receipt.matched"
+  ],
+  "transport": {
+    "kind": "https_sse",
+    "endpoint": "https://coach.internal.example/v1"
+  },
+  "slo": {
+    "p50_ms": 1800,
+    "p95_ms": 4000
+  },
+  "fixtures_uri": "fixtures/sbank.coach/v1/",
+  "health_uri": "https://coach.internal.example/v1/health"
+}

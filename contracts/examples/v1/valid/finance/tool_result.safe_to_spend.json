@@ -1,0 +1,21 @@
+{
+  "schema": "platform.tool_result/v1",
+  "ok": true,
+  "calc_id": "calc_sts_91",
+  "tool": "finance.get_safe_to_spend",
+  "tool_version": "1.2.0",
+  "epistemic": "estimate",
+  "data_mode": "balance",
+  "as_of": "2026-11-19T08:00:00+02:00",
+  "result": {
+    "safe_to_spend_week": { "amount": "90.16", "currency": "EUR" },
+    "flexible_until_payday": { "amount": "247.94", "currency": "EUR" },
+    "days_left_in_week": 4,
+    "days_to_income": 11,
+    "next_income_date": "2026-11-30"
+  },
+  "assumptions": ["Electricity bill estimated at 38.00 EUR from the last 3 months"],
+  "missing_data": [{ "code": "COMMITMENT_ESTIMATED", "detail": "electricity" }],
+  "warnings": [],
+  "confidence": "medium"
+}

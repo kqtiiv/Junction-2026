@@ -1,0 +1,36 @@
+{
+  "schema": "platform.domain_request/v1",
+  "request_id": "req_5521",
+  "turn_id": "t_0193",
+  "session_id": "ses_41",
+  "capability_id": "sbank.coach",
+  "user_ref": "u_7f3a",
+  "locale": "en-FI",
+  "utterance": "does this fit my week",
+  "observations": [
+    {
+      "schema": "platform.observation/v1",
+      "observation_id": "obs_31",
+      "capture_id": "cap_8Hk2",
+      "kind": "price_label",
+      "epistemic": "observed",
+      "extractor": { "provider_id": "ocr.cloud", "version": "2026-11" },
+      "items": [
+        {
+          "label_untrusted": "LANGATTOMAT KUULOKKEET",
+          "price": { "amount": "79.90", "currency": "EUR" },
+          "barcode": "6410405123458",
+          "confidence": 0.91
+        }
+      ],
+      "needs_user_check": false,
+      "issues": [],
+      "created_at": "2026-11-19T17:52:06+02:00"
+    }
+  ],
+  "captures": [],
+  "conversation": { "ref": "conv_22", "recent_turns": [] },
+  "output_constraints": { "speech_max_words": 25, "discreet_mode": false, "display": "phone" },
+  "device_capabilities": ["voice_invocation", "photo_capture", "camera_stream", "inputs"],
+  "deadline_ms": 3500
+}

@@ -1,0 +1,13 @@
+{
+  "schema": "platform.model_provider/v1",
+  "provider_id": "router.device.finance",
+  "kind": "router",
+  "location": "device",
+  "model_ref": "functiongemma-270m-finance-ft",
+  "version": "0.1.0",
+  "languages": ["fi-FI", "en-US"],
+  "data_policy": { "leaves_device": false, "retention": "none" },
+  "slo": { "p50_ms": 150, "p95_ms": 400 },
+  "status": "shadow",
+  "fallback_provider_id": "router.rules"
+}

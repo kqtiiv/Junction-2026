@@ -1,0 +1,22 @@
+{
+  "schema": "platform.tool_descriptor/v1",
+  "name": "finance.calculate_affordability",
+  "version": "1.1.0",
+  "owner": "sbank.coach",
+  "deterministic": true,
+  "side_effects": "none",
+  "description": "Check whether an amount (from a basket, a stated amount, or an observed price label) fits this week's safe-to-spend, and compare it with usual spending.",
+  "input_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "amount": { "type": "string", "pattern": "^(0|[1-9][0-9]*)\\.[0-9]{2}$" },
+      "observation_id": { "type": "string" },
+      "basket_id": { "type": "string" },
+      "category": { "type": "string" }
+    }
+  },
+  "output_schema": { "$ref": "https://contracts.example/v1/finance/finance.schema.json#/definitions/AffordabilityResult" },
+  "result_envelope": "platform.tool_result/v1",
+  "golden_fixtures": "fixtures/sbank.coach/v1/golden/affordability_*.json"
+}

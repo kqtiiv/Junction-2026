@@ -1,0 +1,24 @@
+{
+  "schema": "platform.voice_intent/v1",
+  "turn_id": "t_0193",
+  "session_id": "ses_41",
+  "user_ref": "u_7f3a",
+  "invocation": "hey_meta",
+  "transcript": {
+    "text": "does this fit my week",
+    "lang": "en-FI",
+    "confidence": 0.93,
+    "asr_provider": "asr.device"
+  },
+  "platform_intent": null,
+  "capability_hint": "sbank.coach",
+  "attached_capture_ids": ["cap_8Hk2"],
+  "context": {
+    "active_capability": "sbank.coach",
+    "pending_proposal_id": null,
+    "conversation_ref": "conv_22",
+    "recent_turns": []
+  },
+  "output": { "speech": true, "display": "phone", "discreet_mode": false },
+  "device_capabilities": ["voice_invocation", "photo_capture", "camera_stream", "inputs"]
+}

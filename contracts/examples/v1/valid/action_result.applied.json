@@ -1,0 +1,9 @@
+{
+  "schema": "platform.action_result/v1",
+  "proposal_id": "pc_20",
+  "confirmation_id": "uc_77",
+  "status": "applied",
+  "applied_at": "2026-11-19T17:52:20+02:00",
+  "undo_token": "undo_pc_20",
+  "undo_expires_at": "2026-11-26T17:52:20+02:00"
+}

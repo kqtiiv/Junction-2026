@@ -1,0 +1,5 @@
+{
+  "type": "progress",
+  "stage": "checking_week",
+  "speech_hint": { "en": "Checking your week…", "fi": "Tarkistan viikkosi…" }
+}

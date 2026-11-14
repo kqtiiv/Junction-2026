@@ -1,0 +1,22 @@
+{
+  "schema": "platform.voice_intent/v1",
+  "turn_id": "t_0194",
+  "session_id": "ses_41",
+  "user_ref": "u_7f3a",
+  "invocation": "glasses_input",
+  "input": { "kind": "tap", "device_event_id": "dev_evt_5531" },
+  "platform_intent": "confirm",
+  "capability_hint": null,
+  "attached_capture_ids": [],
+  "context": {
+    "active_capability": "sbank.coach",
+    "pending_proposal_id": "pc_20",
+    "conversation_ref": "conv_22",
+    "recent_turns": [
+      { "role": "user", "text": "does this fit my week" },
+      { "role": "assistant", "text": "If that price is 79.90, it fits, but it would leave about ten euros until Sunday." }
+    ]
+  },
+  "output": { "speech": true, "display": "phone", "discreet_mode": false },
+  "device_capabilities": ["voice_invocation", "photo_capture", "camera_stream", "inputs"]
+}

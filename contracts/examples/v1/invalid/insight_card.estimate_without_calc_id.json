@@ -1,0 +1,89 @@
+{
+  "schema": "platform.insight_card/v1",
+  "card_id": "card_aff_40",
+  "capability_id": "sbank.coach",
+  "type": "metric",
+  "title": {
+    "en": "Does it fit this week?",
+    "fi": "Mahtuuko tämä viikolle?"
+  },
+  "primary": {
+    "label": {
+      "en": "Left until Sunday after buying",
+      "fi": "Jäljellä sunnuntaihin oston jälkeen"
+    },
+    "value": {
+      "amount": "10.26",
+      "currency": "EUR"
+    },
+    "epistemic": "estimate"
+  },
+  "rows": [
+    {
+      "label": {
+        "en": "Price on the label",
+        "fi": "Hintalapun hinta"
+      },
+      "value": {
+        "amount": "79.90",
+        "currency": "EUR"
+      },
+      "epistemic": "observed",
+      "note": {
+        "en": "Read by the camera. Tap to correct.",
+        "fi": "Kameran lukema. Korjaa napauttamalla."
+      }
+    },
+    {
+      "label": {
+        "en": "Safe to spend Thu–Sun",
+        "fi": "Turvallisesti käytettävissä to–su"
+      },
+      "value": {
+        "amount": "90.16",
+        "currency": "EUR"
+      },
+      "epistemic": "estimate"
+    },
+    {
+      "label": {
+        "en": "Verdict",
+        "fi": "Arvio"
+      },
+      "value": "Fits, but tight",
+      "epistemic": "calculated"
+    }
+  ],
+  "epistemic": "estimate",
+  "data_mode": "balance",
+  "basis": {
+    "calc_ids": [],
+    "observation_ids": [
+      "obs_31"
+    ],
+    "as_of": "2026-11-19T17:52:07+02:00"
+  },
+  "assumptions": [
+    {
+      "en": "Electricity bill estimated at €38.00",
+      "fi": "Sähkölasku arvioitu 38,00 €"
+    },
+    {
+      "en": "Spending spread evenly over the 11 days to payday"
+    }
+  ],
+  "missing_data": [],
+  "proposal_ids": [
+    "pc_20"
+  ],
+  "render_hints": {
+    "glasses_display_lines": [
+      "Fits, but tight",
+      "€10 left until Sunday",
+      "estimate"
+    ],
+    "voice_summary": {
+      "en": "It fits, but it would leave about ten euros until Sunday."
+    }
+  }
+}

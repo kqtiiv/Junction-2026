@@ -1,0 +1,21 @@
+{
+  "schema": "platform.domain_event/v1",
+  "event_id": "ev_310",
+  "capability_id": "sbank.coach",
+  "type": "finance.weekly_allowance.low",
+  "user_ref": "u_7f3a",
+  "occurred_at": "2026-11-21T12:00:00+02:00",
+  "expires_at": "2026-11-22T23:59:00+02:00",
+  "dedupe_key": "u_7f3a:2026-W47:allowance_low",
+  "severity": "nudge",
+  "summary": {
+    "en": "Your weekly spending plan is running low.",
+    "fi": "Viikon käyttövara on vähissä."
+  },
+  "card_ref": "card_sts_117",
+  "delivery_prefs": {
+    "phone_notification": true,
+    "glasses_audio": "in_session_only",
+    "spoken_amounts": true
+  }
+}
