@@ -34,6 +34,7 @@ final class CompanionUITests: XCTestCase {
         // The Purchase Receipt (DEC-029): open it and have the backend re-check it independently.
         let receipt = app.buttons["openReceipt"].firstMatch
         XCTAssertTrue(receipt.waitForExistence(timeout: 10), "receipt link on the answer card")
+        for _ in 0..<4 where !receipt.isHittable { app.scrollViews.firstMatch.swipeUp() }
         receipt.tap()
         let check = app.buttons["checkReceipt"]
         XCTAssertTrue(check.waitForExistence(timeout: 10), "receipt sheet")

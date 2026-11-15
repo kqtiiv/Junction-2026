@@ -47,8 +47,8 @@ struct PrimaryButtonStyle: ButtonStyle {
         configuration.label
             .font(.headline)
             .foregroundStyle(Look.onInk)
-            .frame(maxWidth: .infinity, minHeight: 54)
-            .background(Look.ink, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .frame(maxWidth: .infinity, minHeight: 50)
+            .background(Look.ink, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             .opacity(configuration.isPressed ? 0.85 : 1)
             .scaleEffect(configuration.isPressed ? 0.98 : 1)
             .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
@@ -60,7 +60,7 @@ struct OutlineButtonStyle: ButtonStyle {
         configuration.label
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(Look.ink)
-            .frame(maxWidth: .infinity, minHeight: 48)
+            .frame(maxWidth: .infinity, minHeight: 50)
             .background(Look.shelf, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Look.line, lineWidth: 1))
             .opacity(configuration.isPressed ? 0.7 : 1)
@@ -522,43 +522,42 @@ public struct ProposalPanel: View {
     var onSay: (String) -> Void = { _ in }
     private var fi: Bool { locale.hasPrefix("fi") }
 
+    /// The before → after line (what's left changes from … to …); the full breakdown is on the card's receipt.
+    private var change: ProposalDetail? { proposal.details.first { $0.before != nil } }
+
     public var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        // Compact on purpose: it docks above the input bar and must not cover the card it changes.
+        VStack(alignment: .leading, spacing: 10) {
             Text(Display.text(proposal.summary.text, locale: locale))
-                .font(.headline).foregroundStyle(Look.ink)
-                .fixedSize(horizontal: false, vertical: true)
-            ForEach(Array(proposal.details.enumerated()), id: \.offset) { _, d in
-                HStack(spacing: 8) {
-                    Text(Display.text(d.label, locale: locale)).foregroundStyle(Look.slate)
-                    Spacer(minLength: 8)
-                    if let before = d.before {
-                        Text(Display.detail(before, locale: locale)).strikethrough().foregroundStyle(Look.slate)
-                        Image(systemName: "arrow.right").font(.caption.weight(.semibold)).foregroundStyle(Look.slate)
-                            .accessibilityLabel("becomes")
-                    }
+                .font(.subheadline.weight(.semibold)).foregroundStyle(Look.ink)
+                .lineLimit(2)
+            if let d = change, let before = d.before {
+                HStack(spacing: 6) {
+                    Text(Display.text(d.label, locale: locale)).foregroundStyle(Look.slate).lineLimit(1)
+                    Spacer(minLength: 6)
+                    Text(Display.detail(before, locale: locale)).strikethrough().foregroundStyle(Look.slate)
+                    Image(systemName: "arrow.right").font(.caption2.weight(.semibold)).foregroundStyle(Look.slate)
+                        .accessibilityLabel("becomes")
                     Text(Display.detail(d.after, locale: locale)).fontWeight(.semibold).foregroundStyle(Look.ink)
                 }
-                .font(.subheadline).monospacedDigit()
+                .font(.caption).monospacedDigit()
             }
-            VStack(spacing: 8) {
-                Button { onDecide(.confirm) } label: { Text(fi ? "Lisää suunnitelmaan" : "Plan it in") }
+            HStack(spacing: 8) {
+                Button { onDecide(.confirm) } label: { Text(fi ? "Suunnittele" : "Plan it in").lineLimit(1).minimumScaleFactor(0.8) }
                     .buttonStyle(PrimaryButtonStyle())
                     .accessibilityIdentifier("confirmProposal")
-                HStack(spacing: 8) {
-                    Button(fi ? "Odotan" : "I'll wait") { onSay(fi ? "Odotan" : "I'll wait") }
-                        .buttonStyle(OutlineButtonStyle()).accessibilityIdentifier("decideWait")
-                    Button(fi ? "Jätän väliin" : "Skip it") { onSay(fi ? "Jätän väliin" : "Skip it") }
-                        .buttonStyle(OutlineButtonStyle()).accessibilityIdentifier("decideSkip")
-                }
+                Button { onSay(fi ? "Odotan" : "I'll wait") } label: { Text(fi ? "Odotan" : "Wait").lineLimit(1) }
+                    .buttonStyle(OutlineButtonStyle()).accessibilityIdentifier("decideWait")
+                Button { onSay(fi ? "Jätän väliin" : "Skip it") } label: { Text(fi ? "Ohita" : "Skip").lineLimit(1) }
+                    .buttonStyle(OutlineButtonStyle()).accessibilityIdentifier("decideSkip")
             }
-            .padding(.top, 4)
             Text(proposal.reversible ? "Nothing is bought or paid. You can undo this later." : "Nothing is bought or paid.")
-                .font(.caption).foregroundStyle(Look.slate)
+                .font(.caption2).foregroundStyle(Look.slate)
                 .frame(maxWidth: .infinity)
         }
-        .padding(18)
-        .background(Look.shelf, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(Look.line, lineWidth: 1))
+        .padding(14)
+        .background(Look.shelf, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(Look.line, lineWidth: 1))
     }
 }
 
@@ -669,8 +668,12 @@ struct GlassesStatus: View {
     var body: some View {
         HStack(spacing: 6) {
             Circle().fill(dot).frame(width: 8, height: 8)
-            Text(label)
+            Image(systemName: connected ? "eyeglasses" : "iphone")
+            Text(short).lineLimit(1)
         }
+        .fixedSize()
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(label)
         .font(.footnote.weight(.semibold))
         .foregroundStyle(Look.ink)
         .padding(.horizontal, 12)
@@ -682,6 +685,10 @@ struct GlassesStatus: View {
     private var label: String {
         guard connected else { return "Phone only" }
         return backend == "mock" ? "Simulated glasses" : "Glasses connected"
+    }
+    private var short: String {
+        guard connected else { return "Phone only" }
+        return backend == "mock" ? "Simulated" : "Connected"
     }
     private var dot: Color {
         guard connected else { return Look.slate }

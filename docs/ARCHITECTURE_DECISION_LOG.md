@@ -1731,7 +1731,7 @@ The canonical record of every material decision on the glasses platform and its 
 | S25 Pip `simulate_purchase`, delete-data route | Peer project | [fact] Before, after and shortfall of a purchase; explicit data deletion | Read in the repo (MIT) | 2026-11-15 |
 
 ### Implementation
-- **Components affected:** `backend/src/capabilities/sbank-coach/decisions.ts` (new), `fast-path.ts` (options card, intents, memory, decisions card), `adapter.ts` (resolver includes coach calculations); iOS proposal panel (Plan it in / I'll wait / Skip it), option tiles, chips, menu, consent row.
+- **Components affected:** `backend/src/capabilities/sbank-coach/decisions.ts` (new), `fast-path.ts` (options card, intents, memory, decisions card), `adapter.ts` (resolver includes coach calculations); iOS decision panel (one compact row: Plan it in / Wait / Skip, so it never covers the card), option tiles, chips, menu, consent row.
 - **Contracts or schemas affected:** finance tool `finance.summarize_decisions` (additive); `DomainResponse.followups` now used.
 - **Configuration / feature flags:** none.
 - **Tests or demo checks required:** `trust.test.ts` (wait, skip, history, forget, planned); eval `user-waits`.
