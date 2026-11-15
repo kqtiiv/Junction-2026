@@ -55,6 +55,30 @@ struct PrimaryButtonStyle: ButtonStyle {
     }
 }
 
+struct OutlineButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(Look.ink)
+            .frame(maxWidth: .infinity, minHeight: 48)
+            .background(Look.shelf, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Look.line, lineWidth: 1))
+            .opacity(configuration.isPressed ? 0.7 : 1)
+    }
+}
+
+/// A till-receipt rule.
+struct DashedRule: View {
+    var body: some View {
+        GeometryReader { g in
+            Path { p in p.move(to: .zero); p.addLine(to: CGPoint(x: g.size.width, y: 0)) }
+                .stroke(Look.line, style: StrokeStyle(lineWidth: 1, dash: [4, 4]))
+        }
+        .frame(height: 1)
+        .accessibilityHidden(true)
+    }
+}
+
 struct QuietButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -152,22 +176,40 @@ struct PriceTag: View {
 public struct CardView: View {
     let card: InsightCard
     let locale: String
+    /// Re-checks this card's receipt with the backend; nil when the card's original JSON isn't held.
+    var check: (() async -> ReceiptCheck?)? = nil
     @State private var showBasis = false
+    @State private var showReceipt = false
 
-    public init(card: InsightCard, locale: String) { self.card = card; self.locale = locale }
+    public init(card: InsightCard, locale: String, check: (() async -> ReceiptCheck?)? = nil) {
+        self.card = card; self.locale = locale; self.check = check
+    }
+
+    private var abstained: Bool { card.receipt?.confidence.state == .abstained }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(alignment: .firstTextBaseline) {
                 Text(Display.text(card.title, locale: locale)).font(.headline).foregroundStyle(Look.ink)
                 Spacer(minLength: 12)
-                EpistemicChip(epistemic: card.epistemic)
+                if abstained {
+                    Text("No verdict")
+                        .font(.caption.weight(.semibold)).foregroundStyle(Look.ink)
+                        .padding(.horizontal, 10).padding(.vertical, 4)
+                        .background(Look.quiet, in: Capsule())
+                } else {
+                    EpistemicChip(epistemic: card.epistemic)
+                }
             }
             if let primary = card.primary {
                 PriceTag(value: Display.value(primary.value, locale: locale), label: Display.text(primary.label, locale: locale))
             }
             let rows = card.rows ?? []
-            if !rows.isEmpty {
+            if card.type == .comparison && rows.count == 3 {
+                HStack(alignment: .top, spacing: 8) {
+                    ForEach(Array(rows.enumerated()), id: \.offset) { _, row in optionTile(row) }
+                }
+            } else if !rows.isEmpty {
                 VStack(spacing: 0) {
                     ForEach(Array(rows.enumerated()), id: \.offset) { i, row in
                         if i > 0 { Rectangle().fill(Look.line).frame(height: 1) }
@@ -178,12 +220,65 @@ public struct CardView: View {
             if let body = card.body {
                 Text(Display.text(body, locale: locale)).font(.callout).foregroundStyle(Look.ink)
             }
-            if !card.assumptions.isEmpty || !card.basis.calcIDS.isEmpty { basis }
+            if card.receipt != nil {
+                receiptButton
+            } else if !card.assumptions.isEmpty || !card.basis.calcIDS.isEmpty {
+                basis
+            }
         }
         .padding(18)
         .background(Look.shelf, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(Look.line, lineWidth: 1))
-        .accessibilityElement(children: .combine)
+        .sheet(isPresented: $showReceipt) {
+            if let r = card.receipt {
+                ReceiptSheet(title: Display.text(card.title, locale: locale), receipt: r, assumptions: card.assumptions, locale: locale, check: check)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+            }
+        }
+    }
+
+    /// The way into the evidence: what kind of answer this is, and that it was checked.
+    private var receiptButton: some View {
+        Button { showReceipt = true } label: {
+            HStack(spacing: 8) {
+                Image(systemName: card.receipt?.verification?.status == .verified ? "checkmark.seal.fill" : "doc.text")
+                    .foregroundStyle(Look.ink)
+                Text(receiptSummary).font(.subheadline.weight(.semibold)).foregroundStyle(Look.ink)
+                Spacer(minLength: 4)
+                Image(systemName: "chevron.right").font(.caption.weight(.bold)).foregroundStyle(Look.slate)
+            }
+            .padding(.horizontal, 14)
+            .frame(minHeight: 44)
+            .background(Look.aisle, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("openReceipt")
+    }
+
+    private var receiptSummary: String {
+        guard let r = card.receipt else { return "Receipt" }
+        let n = r.verification?.checkedValues ?? 0
+        if r.confidence.state == .abstained { return "Why there's no verdict" }
+        if r.verification?.status == .verified { return "Receipt · \(n) figure\(n == 1 ? "" : "s") checked" }
+        return "Receipt"
+    }
+
+    /// Buy now / wait / skip as three equal tiles.
+    private func optionTile(_ row: CardRow) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(Display.text(row.label, locale: locale)).font(.caption.weight(.semibold)).foregroundStyle(Look.slate)
+            Text(Display.value(row.value, locale: locale))
+                .font(.headline).monospacedDigit().foregroundStyle(Look.ink)
+                .lineLimit(2).minimumScaleFactor(0.7)
+            if let note = row.note {
+                Text(Display.text(note, locale: locale)).font(.caption2).foregroundStyle(Look.slate)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .padding(10)
+        .background(Look.aisle, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     private func rowView(_ row: CardRow) -> some View {
@@ -231,6 +326,183 @@ public struct CardView: View {
     }
 }
 
+// MARK: Receipt (DEC-029)
+
+/// The evidence behind an answer, set like a till receipt: every input and result with its
+/// source, how sure the answer is and why, how fresh the data is, and the platform's signature.
+struct ReceiptSheet: View {
+    let title: String
+    let receipt: Receipt
+    let assumptions: [[String: String]]
+    let locale: String
+    let check: (() async -> ReceiptCheck?)?
+    @State private var checking = false
+    @State private var result: ReceiptCheck?
+    @State private var checkedOnce = false
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Receipt").font(.caption.weight(.semibold)).foregroundStyle(Look.slate)
+                    Text(title).font(.title2.weight(.bold)).foregroundStyle(Look.ink)
+                    HStack(spacing: 8) {
+                        pill(stateLabel, systemImage: stateIcon)
+                        if receipt.verification?.status == .verified { pill("Signed", systemImage: "checkmark.seal") }
+                        if receipt.freshness.simulated { pill("Synthetic data", systemImage: "flask") }
+                    }
+                }
+                DashedRule()
+                VStack(spacing: 10) {
+                    ForEach(Array(receipt.lines.enumerated()), id: \.offset) { _, line in lineView(line) }
+                }
+                if !receipt.confidence.reasons.isEmpty {
+                    DashedRule()
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(receipt.confidence.state == .abstained ? "Why there's no verdict" : "What isn't certain")
+                            .font(.subheadline.weight(.semibold)).foregroundStyle(Look.ink)
+                        ForEach(Array(receipt.confidence.reasons.enumerated()), id: \.offset) { _, r in
+                            Label {
+                                Text(Display.text(r.text, locale: locale)).font(.subheadline).foregroundStyle(Look.ink)
+                            } icon: {
+                                Image(systemName: r.blocksVerdict ? "hand.raised.fill" : "info.circle")
+                                    .foregroundStyle(r.blocksVerdict ? Look.alert : Look.slate)
+                            }
+                        }
+                    }
+                }
+                if !assumptions.isEmpty {
+                    DashedRule()
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Assumptions").font(.subheadline.weight(.semibold)).foregroundStyle(Look.ink)
+                        ForEach(Array(assumptions.enumerated()), id: \.offset) { _, a in
+                            Text("• \(Display.text(a, locale: locale))").font(.caption).foregroundStyle(Look.slate)
+                        }
+                    }
+                }
+                DashedRule()
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Data").font(.subheadline.weight(.semibold)).foregroundStyle(Look.ink)
+                    Text("\(sourceName(receipt.freshness.source)), as of \(receipt.freshness.asOf.formatted(date: .abbreviated, time: .shortened))")
+                        .font(.caption).foregroundStyle(Look.slate)
+                    if receipt.freshness.simulated {
+                        Text("Synthetic demo data, not a real account.").font(.caption).foregroundStyle(Look.slate)
+                    }
+                }
+                if let v = receipt.verification {
+                    DashedRule()
+                    proof(v)
+                }
+            }
+            .padding(20)
+        }
+        .background(Look.shelf.ignoresSafeArea())
+    }
+
+    private var stateLabel: String {
+        switch receipt.confidence.state {
+        case .confident: "Confident"
+        case .caveated: "With caveats"
+        case .abstained: "No verdict"
+        }
+    }
+    private var stateIcon: String {
+        switch receipt.confidence.state {
+        case .confident: "checkmark.circle"
+        case .caveated: "exclamationmark.circle"
+        case .abstained: "hand.raised"
+        }
+    }
+
+    private func pill(_ text: String, systemImage: String) -> some View {
+        Label(text, systemImage: systemImage)
+            .font(.caption.weight(.semibold)).foregroundStyle(Look.ink)
+            .padding(.horizontal, 10).padding(.vertical, 5)
+            .background(Look.aisle, in: Capsule())
+    }
+
+    private func lineView(_ line: ReceiptLine) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text(Display.text(line.label, locale: locale)).font(.subheadline).foregroundStyle(Look.ink)
+                Spacer(minLength: 8)
+                if let m = line.money {
+                    Text(Display.money(m, locale: locale)).font(.system(.subheadline, design: .monospaced).weight(.semibold)).foregroundStyle(Look.ink)
+                } else if let t = line.text {
+                    Text(t).font(line.key == "calculation" ? Font.system(.caption, design: .monospaced) : Font.subheadline.weight(.semibold))
+                        .foregroundStyle(Look.ink).multilineTextAlignment(.trailing)
+                }
+            }
+            HStack(spacing: 6) {
+                EpistemicChip(epistemic: line.epistemic)
+                Text("· \(sourceName(line.source.rawValue))").font(.caption).foregroundStyle(Look.slate)
+            }
+            if let note = line.note {
+                Text(Display.text(note, locale: locale)).font(.caption).foregroundStyle(Look.slate)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private func proof(_ v: ReceiptVerification) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Proof").font(.subheadline.weight(.semibold)).foregroundStyle(Look.ink)
+            Text("Every figure here (\(v.checkedValues)) was matched to the money engine's calculation log before you saw it, then signed by the platform.")
+                .font(.caption).foregroundStyle(Look.slate).fixedSize(horizontal: false, vertical: true)
+            Group {
+                Text("Calculations: \(v.calcIDS.joined(separator: ", "))")
+                Text("Digest: \(String(v.digest.prefix(23)))…")
+                Text("Key: \(v.keyID) · \(v.signedAt.formatted(date: .omitted, time: .standard))")
+            }
+            .font(.caption2.monospaced()).foregroundStyle(Look.slate)
+            if let check {
+                Button {
+                    checking = true
+                    Task { result = await check(); checkedOnce = true; checking = false }
+                } label: {
+                    HStack(spacing: 8) {
+                        if checking { ProgressView().controlSize(.small) }
+                        Text(checking ? "Checking…" : "Check this receipt again")
+                    }
+                }
+                .buttonStyle(OutlineButtonStyle())
+                .disabled(checking)
+                .accessibilityIdentifier("checkReceipt")
+                if checkedOnce { checkResult }
+            }
+        }
+    }
+
+    @ViewBuilder private var checkResult: some View {
+        if let r = result {
+            Label(r.valid ? "Verified just now: signature, contents and every figure match."
+                          : "Doesn't verify: \(r.digestMatches ? "" : "contents changed. ")\(r.signatureValid ? "" : "signature invalid. ")\(r.grounded ? "" : "figures don't match the calculation log.")",
+                  systemImage: r.valid ? "checkmark.seal.fill" : "xmark.octagon.fill")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(r.valid ? Color(hex: 0x2F7D52) : Look.alert)
+        } else {
+            Label("Couldn't reach the server to check.", systemImage: "wifi.exclamationmark")
+                .font(.subheadline).foregroundStyle(Look.slate)
+        }
+    }
+
+    private func sourceName(_ s: String) -> String {
+        switch s {
+        case "camera": "Camera"
+        case "user": "You"
+        case "engine": "Money engine"
+        case "coach": "Coach"
+        case "platform": "Platform"
+        case "fixture": "Demo data (fixture)"
+        case "user_stated": "Your weekly amount"
+        case "s_pankki": "Synthetic bank dataset"
+        case "decision_memory": "Your decisions"
+        default: s
+        }
+    }
+}
+
 // MARK: Confirmation
 
 /// Docked above the input bar while a proposal waits, so the card it changes stays in view.
@@ -238,6 +510,9 @@ public struct ProposalPanel: View {
     let proposal: ActionProposal
     let locale: String
     let onDecide: (PlatformIntent) -> Void
+    /// Wait and skip are said to the coach like any reply (DEC-031).
+    var onSay: (String) -> Void = { _ in }
+    private var fi: Bool { locale.hasPrefix("fi") }
 
     public var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -257,11 +532,16 @@ public struct ProposalPanel: View {
                 }
                 .font(.subheadline).monospacedDigit()
             }
-            VStack(spacing: 2) {
-                Button { onDecide(.confirm) } label: { Text("Confirm") }
+            VStack(spacing: 8) {
+                Button { onDecide(.confirm) } label: { Text(fi ? "Lisää suunnitelmaan" : "Plan it in") }
                     .buttonStyle(PrimaryButtonStyle())
                     .accessibilityIdentifier("confirmProposal")
-                Button("Not now") { onDecide(.reject) }.buttonStyle(QuietButtonStyle())
+                HStack(spacing: 8) {
+                    Button(fi ? "Odotan" : "I'll wait") { onSay(fi ? "Odotan" : "I'll wait") }
+                        .buttonStyle(OutlineButtonStyle()).accessibilityIdentifier("decideWait")
+                    Button(fi ? "Jätän väliin" : "Skip it") { onSay(fi ? "Jätän väliin" : "Skip it") }
+                        .buttonStyle(OutlineButtonStyle()).accessibilityIdentifier("decideSkip")
+                }
             }
             .padding(.top, 4)
             Text(proposal.reversible ? "Nothing is bought or paid. You can undo this later." : "Nothing is bought or paid.")
@@ -303,6 +583,9 @@ public struct ConsentView: View {
                     Rectangle().fill(Look.line).frame(height: 1)
                     row("hand.raised", "Nothing happens without your OK",
                         "Nothing is bought or paid on your behalf. You can withdraw this permission at any time.")
+                    Rectangle().fill(Look.line).frame(height: 1)
+                    row("clock.arrow.circlepath", "Only what you decide is remembered",
+                        "If you plan, wait on or skip something, I keep its name, price and date. Say “forget my decisions” to delete them.")
                 }
                 .padding(.horizontal, 16)
                 .background(Look.shelf, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
@@ -423,7 +706,9 @@ public struct CompanionScreen: View {
                             .font(.callout).foregroundStyle(Look.alert)
                     }
                     if model.cards.isEmpty && model.lastSpeech.isEmpty && model.errorText == nil { emptyState }
-                    ForEach(model.cards, id: \.cardID) { CardView(card: $0, locale: locale) }
+                    ForEach(model.cards, id: \.cardID) { card in
+                        CardView(card: card, locale: locale, check: checker(card.cardID))
+                    }
                     if showDebug {
                         DebugOverlay(state: model.deviceState, glassesBackend: model.glassesBackend, debug: model.debug)
                             .padding(.top, 8)
@@ -457,6 +742,8 @@ public struct CompanionScreen: View {
             Menu {
                 Button("Connect glasses") { Task { await model.connectGlasses() } }.accessibilityIdentifier("connectGlasses")
                 Button("Use phone only") { Task { await model.useGlasses(false) } }
+                Button("Your decisions") { Task { await model.showDecisions() } }
+                Button("Forget my decisions", role: .destructive) { Task { await model.forgetDecisions() } }
                 Toggle("Discreet mode (no amounts spoken)", isOn: $model.discreetMode)
                 Toggle("Debug overlay", isOn: $showDebug)
             } label: {
@@ -518,6 +805,19 @@ public struct CompanionScreen: View {
         .padding(.top, 40)
     }
 
+    /// The backend re-check for a card's receipt, when this card's original JSON is held.
+    private func checker(_ cardID: String) -> (() async -> ReceiptCheck?)? {
+        guard model.canCheckReceipt(cardID: cardID) else { return nil }
+        let model = self.model
+        return { await model.checkReceipt(cardID: cardID) }
+    }
+
+    /// The last answer's suggested replies, else the starters.
+    private var chips: [String] {
+        let replies = model.followups.map { Display.text($0, locale: locale) }.filter { !$0.isEmpty }
+        return replies.isEmpty ? suggestions : replies
+    }
+
     /// Questions the coach answers today, as one-tap starters.
     private var suggestions: [String] {
         let fi = locale.hasPrefix("fi")
@@ -530,7 +830,9 @@ public struct CompanionScreen: View {
     private var dock: some View {
         VStack(spacing: 0) {
             if let proposal = model.proposal {
-                ProposalPanel(proposal: proposal, locale: locale) { decision in Task { await model.confirmByTap(decision) } }
+                ProposalPanel(proposal: proposal, locale: locale,
+                              onDecide: { decision in Task { await model.confirmByTap(decision) } },
+                              onSay: { text in Task { await model.ask(typed: text) } })
                     .padding(.horizontal, 16)
                     .padding(.bottom, 10)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -552,11 +854,11 @@ public struct CompanionScreen: View {
                     Text("Working on it…")
                 }
                 .font(.callout).foregroundStyle(Look.slate)
-            } else if model.proposal == nil && !typing && model.cards.isEmpty && model.lastQuestion.isEmpty {
-            // Starters only before the first question; after that the screen is about the item asked about (DEC-028).
+            } else if model.proposal == nil && !typing && (!model.followups.isEmpty || (model.cards.isEmpty && model.lastQuestion.isEmpty)) {
+            // Starters only before the first question; after that, only replies to the last answer (DEC-028, DEC-030).
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
-                        ForEach(suggestions, id: \.self) { s in
+                        ForEach(chips, id: \.self) { s in
                             Button(s) { Task { await model.ask(typed: s) } }
                                 .font(.subheadline.weight(.medium))
                                 .foregroundStyle(Look.ink)

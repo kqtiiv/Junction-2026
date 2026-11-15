@@ -1062,9 +1062,9 @@ public struct ReceiptConfidence: Codable {
     public let reasons: [ReceiptReason]
     /// confident: answered without reservations. caveated: answered, with reasons shown.
     /// abstained: no verdict was given, because the data could not support one.
-    public let state: State
+    public let state: ReceiptConfidenceState
 
-    public init(reasons: [ReceiptReason], state: State) {
+    public init(reasons: [ReceiptReason], state: ReceiptConfidenceState) {
         self.reasons = reasons
         self.state = state
     }
@@ -1090,7 +1090,7 @@ public extension ReceiptConfidence {
 
     func with(
         reasons: [ReceiptReason]? = nil,
-        state: State? = nil
+        state: ReceiptConfidenceState? = nil
     ) -> ReceiptConfidence {
         return ReceiptConfidence(
             reasons: reasons ?? self.reasons,
@@ -1166,7 +1166,7 @@ public extension ReceiptReason {
 
 /// confident: answered without reservations. caveated: answered, with reasons shown.
 /// abstained: no verdict was given, because the data could not support one.
-public enum State: String, Codable {
+public enum ReceiptConfidenceState: String, Codable {
     case abstained = "abstained"
     case caveated = "caveated"
     case confident = "confident"
@@ -1238,10 +1238,10 @@ public struct ReceiptLine: Codable {
     public let money: Money?
     public let note: [String: String]?
     public let ref: String?
-    public let source: LineSource
+    public let source: ReceiptLineSource
     public let text: String?
 
-    public init(epistemic: Epistemic, key: String, label: [String: String], money: Money?, note: [String: String]?, ref: String?, source: LineSource, text: String?) {
+    public init(epistemic: Epistemic, key: String, label: [String: String], money: Money?, note: [String: String]?, ref: String?, source: ReceiptLineSource, text: String?) {
         self.epistemic = epistemic
         self.key = key
         self.label = label
@@ -1278,7 +1278,7 @@ public extension ReceiptLine {
         money: Money?? = nil,
         note: [String: String]?? = nil,
         ref: String?? = nil,
-        source: LineSource? = nil,
+        source: ReceiptLineSource? = nil,
         text: String?? = nil
     ) -> ReceiptLine {
         return ReceiptLine(
@@ -1302,7 +1302,7 @@ public extension ReceiptLine {
     }
 }
 
-public enum LineSource: String, Codable {
+public enum ReceiptLineSource: String, Codable {
     case camera = "camera"
     case coach = "coach"
     case engine = "engine"
@@ -1320,7 +1320,7 @@ public struct ReceiptVerification: Codable {
     /// Compact JWS (ES256) by the platform over {card_id, digest, calc_ids, status, signed_at}.
     public let signature: String
     public let signedAt: Date
-    public let status: VerificationStatus
+    public let status: ReceiptVerificationStatus
 
     public enum CodingKeys: String, CodingKey {
         case calcIDS = "calc_ids"
@@ -1332,7 +1332,7 @@ public struct ReceiptVerification: Codable {
         case status
     }
 
-    public init(calcIDS: [String], checkedValues: Int, digest: String, keyID: String, signature: String, signedAt: Date, status: VerificationStatus) {
+    public init(calcIDS: [String], checkedValues: Int, digest: String, keyID: String, signature: String, signedAt: Date, status: ReceiptVerificationStatus) {
         self.calcIDS = calcIDS
         self.checkedValues = checkedValues
         self.digest = digest
@@ -1368,7 +1368,7 @@ public extension ReceiptVerification {
         keyID: String? = nil,
         signature: String? = nil,
         signedAt: Date? = nil,
-        status: VerificationStatus? = nil
+        status: ReceiptVerificationStatus? = nil
     ) -> ReceiptVerification {
         return ReceiptVerification(
             calcIDS: calcIDS ?? self.calcIDS,
@@ -1390,7 +1390,7 @@ public extension ReceiptVerification {
     }
 }
 
-public enum VerificationStatus: String, Codable {
+public enum ReceiptVerificationStatus: String, Codable {
     case failed = "failed"
     case verified = "verified"
 }
@@ -1744,7 +1744,7 @@ public struct ContextCapture: Codable {
     public let purpose: String
     public let schema: ContextCaptureSchema
     public let sessionID: String
-    public let source: ContextCaptureSource
+    public let source: Source
     public let trigger: Trigger
     public let userRef: String
 
@@ -1758,7 +1758,7 @@ public struct ContextCapture: Codable {
         case userRef = "user_ref"
     }
 
-    public init(captureID: String, capturedAt: Date, consentGrantID: String, locale: String, media: CaptureMedia, minimisation: [Minimisation], purpose: String, schema: ContextCaptureSchema, sessionID: String, source: ContextCaptureSource, trigger: Trigger, userRef: String) {
+    public init(captureID: String, capturedAt: Date, consentGrantID: String, locale: String, media: CaptureMedia, minimisation: [Minimisation], purpose: String, schema: ContextCaptureSchema, sessionID: String, source: Source, trigger: Trigger, userRef: String) {
         self.captureID = captureID
         self.capturedAt = capturedAt
         self.consentGrantID = consentGrantID
@@ -1802,7 +1802,7 @@ public extension ContextCapture {
         purpose: String? = nil,
         schema: ContextCaptureSchema? = nil,
         sessionID: String? = nil,
-        source: ContextCaptureSource? = nil,
+        source: Source? = nil,
         trigger: Trigger? = nil,
         userRef: String? = nil
     ) -> ContextCapture {
@@ -1926,7 +1926,7 @@ public enum ContextCaptureSchema: String, Codable {
     case platformContextCaptureV1 = "platform.context_capture/v1"
 }
 
-public enum ContextCaptureSource: String, Codable {
+public enum Source: String, Codable {
     case glassesPhoto = "glasses_photo"
     case glassesStreamFrame = "glasses_stream_frame"
     case phoneCamera = "phone_camera"

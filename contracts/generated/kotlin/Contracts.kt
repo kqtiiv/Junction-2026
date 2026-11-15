@@ -403,7 +403,7 @@ data class ReceiptConfidence (
      * confident: answered without reservations. caveated: answered, with reasons shown.
      * abstained: no verdict was given, because the data could not support one.
      */
-    val state: State
+    val state: ReceiptConfidenceState
 )
 
 @Serializable
@@ -420,7 +420,7 @@ data class ReceiptReason (
  * abstained: no verdict was given, because the data could not support one.
  */
 @Serializable
-enum class State(val value: String) {
+enum class ReceiptConfidenceState(val value: String) {
     @SerialName("abstained") Abstained("abstained"),
     @SerialName("caveated") Caveated("caveated"),
     @SerialName("confident") Confident("confident");
@@ -447,12 +447,12 @@ data class ReceiptLine (
     val money: Money? = null,
     val note: Map<String, String>? = null,
     val ref: String? = null,
-    val source: LineSource,
+    val source: ReceiptLineSource,
     val text: String? = null
 )
 
 @Serializable
-enum class LineSource(val value: String) {
+enum class ReceiptLineSource(val value: String) {
     @SerialName("camera") Camera("camera"),
     @SerialName("coach") Coach("coach"),
     @SerialName("engine") Engine("engine"),
@@ -482,11 +482,11 @@ data class ReceiptVerification (
     @SerialName("signed_at")
     val signedAt: String,
 
-    val status: VerificationStatus
+    val status: ReceiptVerificationStatus
 )
 
 @Serializable
-enum class VerificationStatus(val value: String) {
+enum class ReceiptVerificationStatus(val value: String) {
     @SerialName("failed") Failed("failed"),
     @SerialName("verified") Verified("verified");
 }
@@ -665,7 +665,7 @@ data class ContextCapture (
     @SerialName("session_id")
     val sessionID: String,
 
-    val source: ContextCaptureSource,
+    val source: Source,
     val trigger: Trigger,
 
     @SerialName("user_ref")
@@ -712,7 +712,7 @@ enum class ContextCaptureSchema(val value: String) {
 }
 
 @Serializable
-enum class ContextCaptureSource(val value: String) {
+enum class Source(val value: String) {
     @SerialName("glasses_photo") GlassesPhoto("glasses_photo"),
     @SerialName("glasses_stream_frame") GlassesStreamFrame("glasses_stream_frame"),
     @SerialName("phone_camera") PhoneCamera("phone_camera"),

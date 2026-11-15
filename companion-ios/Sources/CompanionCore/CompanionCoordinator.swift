@@ -29,6 +29,11 @@ public struct TurnOutcome {
     public var debug: [String: Any] = [:]
     /// True when the turn was aborted (no final delivered, DEC-011).
     public var aborted = false
+    /// Suggested replies shown as chips ("It's 19.90", "I'll wait").
+    public var followups: [[String: String]] = []
+    /// Each card's JSON exactly as received, by card_id: what receipt verification sends back (DEC-029).
+    /// Re-encoding through Codable could change dates or drop fields and break the signed digest.
+    public var rawCards: [String: Data] = [:]
 }
 
 public enum CaptureSource { case glasses, phoneCamera }
@@ -289,10 +294,16 @@ public final class CompanionCoordinator {
                             outcome.status = r.status
                             outcome.cards = r.cards
                             outcome.proposal = r.proposals.first
+                            outcome.followups = r.followups ?? []
                         }
                         if let obj = try? JSONSerialization.jsonObject(with: raw) as? [String: Any],
-                           let resp = obj["response"] as? [String: Any], let dbg = resp["x_debug"] as? [String: Any] {
-                            outcome.debug = dbg
+                           let resp = obj["response"] as? [String: Any] {
+                            if let dbg = resp["x_debug"] as? [String: Any] { outcome.debug = dbg }
+                            for card in (resp["cards"] as? [[String: Any]]) ?? [] {
+                                if let id = card["card_id"] as? String, let data = try? JSONSerialization.data(withJSONObject: card) {
+                                    outcome.rawCards[id] = data
+                                }
+                            }
                         }
                     }
                 }

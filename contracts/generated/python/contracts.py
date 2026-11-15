@@ -335,7 +335,7 @@ class ReceiptReason:
         return result
 
 
-class State(Enum):
+class ReceiptConfidenceState(Enum):
     """confident: answered without reservations. caveated: answered, with reasons shown.
     abstained: no verdict was given, because the data could not support one.
     """
@@ -347,7 +347,7 @@ class State(Enum):
 @dataclass
 class ReceiptConfidence:
     reasons: List[ReceiptReason]
-    state: State
+    state: ReceiptConfidenceState
     """confident: answered without reservations. caveated: answered, with reasons shown.
     abstained: no verdict was given, because the data could not support one.
     """
@@ -356,13 +356,13 @@ class ReceiptConfidence:
     def from_dict(obj: Any) -> 'ReceiptConfidence':
         assert isinstance(obj, dict)
         reasons = from_list(ReceiptReason.from_dict, obj.get("reasons"))
-        state = State(obj.get("state"))
+        state = ReceiptConfidenceState(obj.get("state"))
         return ReceiptConfidence(reasons, state)
 
     def to_dict(self) -> dict:
         result: dict = {}
         result["reasons"] = from_list(lambda x: to_class(ReceiptReason, x), self.reasons)
-        result["state"] = to_enum(State, self.state)
+        result["state"] = to_enum(ReceiptConfidenceState, self.state)
         return result
 
 
@@ -390,7 +390,7 @@ class ReceiptFreshness:
         return result
 
 
-class LineSource(Enum):
+class ReceiptLineSource(Enum):
     CAMERA = "camera"
     COACH = "coach"
     ENGINE = "engine"
@@ -404,7 +404,7 @@ class ReceiptLine:
     epistemic: Epistemic
     key: str
     label: Dict[str, str]
-    source: LineSource
+    source: ReceiptLineSource
     money: Optional[Money] = None
     note: Optional[Dict[str, str]] = None
     ref: Optional[str] = None
@@ -416,7 +416,7 @@ class ReceiptLine:
         epistemic = Epistemic(obj.get("epistemic"))
         key = from_str(obj.get("key"))
         label = from_dict(from_str, obj.get("label"))
-        source = LineSource(obj.get("source"))
+        source = ReceiptLineSource(obj.get("source"))
         money = from_union([Money.from_dict, from_none], obj.get("money"))
         note = from_union([lambda x: from_dict(from_str, x), from_none], obj.get("note"))
         ref = from_union([from_str, from_none], obj.get("ref"))
@@ -428,7 +428,7 @@ class ReceiptLine:
         result["epistemic"] = to_enum(Epistemic, self.epistemic)
         result["key"] = from_str(self.key)
         result["label"] = from_dict(from_str, self.label)
-        result["source"] = to_enum(LineSource, self.source)
+        result["source"] = to_enum(ReceiptLineSource, self.source)
         if self.money is not None:
             result["money"] = from_union([lambda x: to_class(Money, x), from_none], self.money)
         if self.note is not None:
@@ -440,7 +440,7 @@ class ReceiptLine:
         return result
 
 
-class VerificationStatus(Enum):
+class ReceiptVerificationStatus(Enum):
     FAILED = "failed"
     VERIFIED = "verified"
 
@@ -455,7 +455,7 @@ class ReceiptVerification:
     """Compact JWS (ES256) by the platform over {card_id, digest, calc_ids, status, signed_at}."""
 
     signed_at: datetime
-    status: VerificationStatus
+    status: ReceiptVerificationStatus
 
     @staticmethod
     def from_dict(obj: Any) -> 'ReceiptVerification':
@@ -466,7 +466,7 @@ class ReceiptVerification:
         key_id = from_str(obj.get("key_id"))
         signature = from_str(obj.get("signature"))
         signed_at = from_datetime(obj.get("signed_at"))
-        status = VerificationStatus(obj.get("status"))
+        status = ReceiptVerificationStatus(obj.get("status"))
         return ReceiptVerification(calc_ids, checked_values, digest, key_id, signature, signed_at, status)
 
     def to_dict(self) -> dict:
@@ -477,7 +477,7 @@ class ReceiptVerification:
         result["key_id"] = from_str(self.key_id)
         result["signature"] = from_str(self.signature)
         result["signed_at"] = self.signed_at.isoformat()
-        result["status"] = to_enum(VerificationStatus, self.status)
+        result["status"] = to_enum(ReceiptVerificationStatus, self.status)
         return result
 
 
@@ -882,7 +882,7 @@ class ContextCaptureSchema(Enum):
     PLATFORM_CONTEXT_CAPTURE_V1 = "platform.context_capture/v1"
 
 
-class ContextCaptureSource(Enum):
+class Source(Enum):
     GLASSES_PHOTO = "glasses_photo"
     GLASSES_STREAM_FRAME = "glasses_stream_frame"
     PHONE_CAMERA = "phone_camera"
@@ -916,7 +916,7 @@ class ContextCapture:
     """
     schema: ContextCaptureSchema
     session_id: str
-    source: ContextCaptureSource
+    source: Source
     trigger: Trigger
     user_ref: str
 
@@ -932,7 +932,7 @@ class ContextCapture:
         purpose = from_str(obj.get("purpose"))
         schema = ContextCaptureSchema(obj.get("schema"))
         session_id = from_str(obj.get("session_id"))
-        source = ContextCaptureSource(obj.get("source"))
+        source = Source(obj.get("source"))
         trigger = Trigger(obj.get("trigger"))
         user_ref = from_str(obj.get("user_ref"))
         return ContextCapture(capture_id, captured_at, consent_grant_id, locale, media, minimisation, purpose, schema, session_id, source, trigger, user_ref)
@@ -948,7 +948,7 @@ class ContextCapture:
         result["purpose"] = from_str(self.purpose)
         result["schema"] = to_enum(ContextCaptureSchema, self.schema)
         result["session_id"] = from_str(self.session_id)
-        result["source"] = to_enum(ContextCaptureSource, self.source)
+        result["source"] = to_enum(Source, self.source)
         result["trigger"] = to_enum(Trigger, self.trigger)
         result["user_ref"] = from_str(self.user_ref)
         return result

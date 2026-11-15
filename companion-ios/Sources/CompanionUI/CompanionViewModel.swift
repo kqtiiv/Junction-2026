@@ -9,6 +9,10 @@ import CompanionCore
 public final class CompanionViewModel: ObservableObject {
     @Published public private(set) var cards: [InsightCard] = []
     @Published public private(set) var proposal: ActionProposal?
+    /// Suggested replies from the last answer, shown as chips (DEC-030/031).
+    @Published public private(set) var followups: [[String: String]] = []
+    /// Cards' JSON as received, for independent receipt checks (DEC-029).
+    private var rawCards: [String: Data] = [:]
     @Published public private(set) var lastSpeech = ""
     /// What the user last asked (typed or spoken), shown above the answer. Decisions and "stop" don't replace it.
     @Published public private(set) var lastQuestion = ""
@@ -129,6 +133,7 @@ public final class CompanionViewModel: ObservableObject {
                 case .confirm, .reject:
                     outcome = try await coordinator.decide(pi, by: invocation == .typed ? .typed(transcript) : .voice(transcript))
                     proposal = nil
+                    followups = []
                     if !outcome.cards.isEmpty { cards = outcome.cards }
                 case .stop, .cancel:
                     speechOut.stop()
@@ -142,6 +147,8 @@ public final class CompanionViewModel: ObservableObject {
                 outcome = try await coordinator.ask(transcript, invocation: invocation, capture: capture)
                 cards = outcome.cards
                 proposal = outcome.proposal
+                followups = outcome.followups
+                rawCards = outcome.rawCards
             }
             apply(outcome)
         } catch { show(error) }
@@ -154,6 +161,7 @@ public final class CompanionViewModel: ObservableObject {
             apply(outcome)
             if !outcome.cards.isEmpty { cards = outcome.cards }   // the updated week replaces the stale answer
             proposal = nil
+            followups = []
         } catch { show(error) }
     }
 
@@ -167,6 +175,19 @@ public final class CompanionViewModel: ObservableObject {
             proposal = nil
         } catch { show(error) }
     }
+
+    /// Re-checks a card's receipt with the backend: signature, digest, figures (DEC-029).
+    /// Nil when this card's original JSON isn't held (e.g. a card returned by a confirmation).
+    public func checkReceipt(cardID: String) async -> ReceiptCheck? {
+        guard let raw = rawCards[cardID] else { return nil }
+        return try? await coordinator.client.verifyReceipt(rawCard: raw)
+    }
+
+    public func canCheckReceipt(cardID: String) -> Bool { rawCards[cardID] != nil }
+
+    /// "Your decisions" and "Forget my decisions" are ordinary questions to the coach (DEC-031).
+    public func showDecisions() async { await ask(typed: locale.hasPrefix("fi") ? "päätökseni" : "what have I decided") }
+    public func forgetDecisions() async { await ask(typed: locale.hasPrefix("fi") ? "unohda päätökseni" : "forget my decisions") }
 
     /// Hides the confirm sheet. The proposal stays pending until it expires or is decided.
     public func dismissProposal() { proposal = nil }

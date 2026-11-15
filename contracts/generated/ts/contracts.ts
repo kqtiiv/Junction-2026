@@ -31,6 +31,12 @@ export type DecimalString = string;
  * What kind of claim this is. fact = read from a record; calculated = deterministic from facts; estimate = deterministic but depends on assumptions or forecasts; educational = general content, not about the user's data; observed = perceived from a camera capture and may be misread.
  */
 export type Epistemic = "fact" | "calculated" | "estimate" | "educational" | "observed";
+export type ReceiptLineSource = "camera" | "user" | "engine" | "coach" | "platform" | "fixture";
+/**
+ * confident: answered without reservations. caveated: answered, with reasons shown. abstained: no verdict was given, because the data could not support one.
+ */
+export type ReceiptConfidenceState = "confident" | "caveated" | "abstained";
+export type ReceiptVerificationStatus = "verified" | "failed";
 /**
  * Dotted intent or event id with at least two segments, e.g. 'finance.safe_to_spend'.
  */
@@ -286,15 +292,12 @@ export interface ReceiptLine {
   money?: Money;
   text?: string;
   epistemic: Epistemic;
-  source: "camera" | "user" | "engine" | "coach" | "platform" | "fixture";
+  source: ReceiptLineSource;
   ref?: Ref;
   note?: LText;
 }
 export interface ReceiptConfidence {
-  /**
-   * confident: answered without reservations. caveated: answered, with reasons shown. abstained: no verdict was given, because the data could not support one.
-   */
-  state: "confident" | "caveated" | "abstained";
+  state: ReceiptConfidenceState;
   /**
    * @maxItems 8
    */
@@ -314,7 +317,7 @@ export interface ReceiptFreshness {
   simulated: boolean;
 }
 export interface ReceiptVerification {
-  status: "verified" | "failed";
+  status: ReceiptVerificationStatus;
   checked_values: number;
   calc_ids: Ref[];
   digest: Sha256;

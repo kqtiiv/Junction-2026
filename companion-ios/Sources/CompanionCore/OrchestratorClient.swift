@@ -6,6 +6,23 @@ import FoundationNetworking
 #endif
 import Contracts
 
+/// Result of POST /v1/receipts/verify.
+public struct ReceiptCheck: Codable, Equatable {
+    public let valid: Bool
+    public let signatureValid: Bool
+    public let digestMatches: Bool
+    public let grounded: Bool
+    public let checkedValues: Int?
+    public let reason: String?
+
+    enum CodingKeys: String, CodingKey {
+        case valid, grounded, reason
+        case signatureValid = "signature_valid"
+        case digestMatches = "digest_matches"
+        case checkedValues = "checked_values"
+    }
+}
+
 public struct SessionInfo: Codable, Equatable {
     public let sessionID: String
     public let conversationRef: String
@@ -113,6 +130,14 @@ public final class OrchestratorClient {
     public func confirm(proposalID: String, decision: String, channel: ConfirmChannel, evidence: [String: Any]) async throws -> ActionResult {
         let body: [String: Any] = ["proposal_id": proposalID, "decision": decision, "channel": channel.rawValue, "evidence": evidence]
         return try await send("POST", "/v1/confirmations", json: try JSONSerialization.data(withJSONObject: body), expect: 200)
+    }
+
+    /// Independent check of a card's receipt (DEC-029): signature, digest, and every figure against
+    /// this user's calculation log. `rawCard` is the card's JSON exactly as it was received.
+    public func verifyReceipt(rawCard: Data) async throws -> ReceiptCheck {
+        let card = try JSONSerialization.jsonObject(with: rawCard)
+        let body = try JSONSerialization.data(withJSONObject: ["card": card])
+        return try await send("POST", "/v1/receipts/verify", json: body, expect: 200)
     }
 
     /// Sends one turn and streams its events. Cancelling the consuming task cancels the request.

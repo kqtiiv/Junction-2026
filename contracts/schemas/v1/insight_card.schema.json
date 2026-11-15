@@ -78,6 +78,7 @@
           "required": ["state", "reasons"],
           "properties": {
             "state": {
+              "title": "ReceiptConfidenceState",
               "description": "confident: answered without reservations. caveated: answered, with reasons shown. abstained: no verdict was given, because the data could not support one.",
               "type": "string",
               "enum": ["confident", "caveated", "abstained"]
@@ -102,7 +103,7 @@
           "type": "object",
           "required": ["status", "checked_values", "calc_ids", "digest", "signature", "key_id", "signed_at"],
           "properties": {
-            "status": { "type": "string", "enum": ["verified", "failed"] },
+            "status": { "title": "ReceiptVerificationStatus", "type": "string", "enum": ["verified", "failed"] },
             "checked_values": { "type": "integer", "minimum": 0 },
             "calc_ids": { "type": "array", "items": { "$ref": "common.schema.json#/definitions/Ref" } },
             "digest": { "$ref": "common.schema.json#/definitions/Sha256" },
@@ -125,7 +126,7 @@
         "money": { "$ref": "common.schema.json#/definitions/Money" },
         "text": { "type": "string", "maxLength": 200 },
         "epistemic": { "$ref": "common.schema.json#/definitions/Epistemic" },
-        "source": { "type": "string", "enum": ["camera", "user", "engine", "coach", "platform", "fixture"] },
+        "source": { "title": "ReceiptLineSource", "type": "string", "enum": ["camera", "user", "engine", "coach", "platform", "fixture"] },
         "ref": { "$ref": "common.schema.json#/definitions/Ref" },
         "note": { "$ref": "common.schema.json#/definitions/LText" }
       },
