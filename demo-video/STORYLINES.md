@@ -10,7 +10,7 @@ Fixed for all three (agreed earlier):
 Every number and sentence on screen comes from the real app, using the CI fixture run. The real values:
 - The label: "LANGATTOMAT KUULOKKEET 79,90 €".
 - The spoken answer: "If that price is 79.90, it fits, but it would leave about 10 euros until Sunday. Want me to plan it in?"
-- The confirm sheet: "Price (read from the label) 79,90 €", and "Safe to spend this week" going from 90,16 € to 10,26 €.
+- The decision panel: "Safe to spend this week" going from 90,16 € to 10,26 €, with Plan it in / Wait / Skip. (It replaced the confirm sheet on 2026-11-15.) The Purchase Receipt shows the same numbers with their sources.
 - After confirming: "Done. You can undo it on your phone.", flexible money 168,04 €, 4 days left.
 - The no-bank question, taken from the real `user_stated` replies.
 
@@ -18,7 +18,7 @@ App cards are rebuilt at 1.6–2× size from these real labels and values, witho
 
 Filmed slots, which you shoot:
 - F1: glasses POV at the shelf label, about 6 s.
-- F2: a thumb tapping Confirm, about 3 s.
+- F2: a thumb tapping Plan it in, about 3 s.
 - F3: taking the glasses off, about 3 s.
 
 Until you shoot them, each slot shows a labelled placeholder.
@@ -29,7 +29,7 @@ Until you shoot them, each slot shows a labelled placeholder.
 
 **Device:** a moment in someone's day. **Form:** object-to-object chain.
 
-**What the viewer sees and feels:** One shopper stands in front of one shelf with one price tag. The price "79,90 €" never leaves the screen. It lifts off the label, becomes the number in the spoken answer, then becomes a row on the confirm card. On Confirm it ticks the week down from 90,16 € to 10,26 €. The viewer feels the decision being made in the aisle, not afterwards in a banking app.
+**What the viewer sees and feels:** One shopper stands in front of one shelf with one price tag. The price "79,90 €" never leaves the screen. It lifts off the label, becomes the number in the spoken answer, then becomes a row on the decision panel. On Plan it in it ticks the week down from 90,16 € to 10,26 €. The viewer feels the decision being made in the aisle, not afterwards in a banking app.
 
 **First 2 s:** We look through the glasses (F1). The yellow shelf tag fills the frame. The caption *"does this fit my week?"* types in under it, one word per beat.
 
@@ -40,7 +40,7 @@ Until you shoot them, each slot shows a labelled placeholder.
 | 0–8 s | Hook | The question asked at the shelf. |
 | 8–22 s | Tension | The old way: unlock the phone, open the bank app, scroll transactions. The aisle blurs and the moment passes. |
 | 22–30 s | Reveal | "Spendtacles" type-slams onto a dark card. |
-| 30–80 s | Proof, four verbs | **Look:** the label is read, with the purple "read by camera" chip. **Ask.** **Hear:** the real sentence as big captions with a waveform. **Tap:** F2, then the Confirm button. |
+| 30–80 s | Proof, four verbs | **Look:** the label is read, with the purple "read by camera" chip. **Ask.** **Hear:** the real sentence as big captions with a waveform. **Tap:** F2, then the Plan it in button. |
 | 80–92 s | Payoff | The number ticks 90,16 € → 10,26 € at full size with a sound tick. |
 | 92–108 s | No bank? | "No bank connected?" The phone asks one question, "Roughly how much do you have for this week?", and "about a hundred" becomes the budget. |
 | 108–114 s | Trust | Four short lines, each on its own real chip: every number checked, photo deleted, you consent first, it never moves money. |
@@ -48,11 +48,11 @@ Until you shoot them, each slot shows a labelled placeholder.
 
 **Look:** two worlds.
 - The aisle: real footage, warm shop light.
-- The phone: the app's own light iOS greys, #F2F2F7 cards, black SF/Inter type, the blue #0A84FF Confirm button, and the real chip colours (orange estimate, green fact, purple read by camera).
+- The phone (the app's look since 2026-11-15, DEC-027): aisle white #F3F5F4 ground, white cards with hairlines, spruce ink #1F2D27 text and buttons, the shelf-tag yellow #FFDA3D price tag with heavy compressed numerals, and the real dot labels (orange estimate, green fact, purple read by camera).
 
-The dark cards appear only for the reveal and the end card, with type filling the frame. The accent is rationed to the Confirm button and the ticking number.
+The dark cards appear only for the reveal and the end card, with type filling the frame. The accent is rationed to the yellow price tag and the ticking number.
 
-**Sound:** A calm, low-tempo beat. The aisle has room tone. There's a soft click on Confirm, and a mechanical tick for each step of the number.
+**Sound:** A calm, low-tempo beat. The aisle has room tone. There's a soft click on Plan it in, and a mechanical tick for each step of the number.
 
 ---
 
@@ -76,7 +76,7 @@ Diving into the 79,90 lands on the real price label. Diving into the label pulls
 | 0–10 s | Hook: the answer. |
 | 10–25 s | Tension: "Finance AI makes numbers up." A struck-through wrong answer. |
 | 25–70 s | Proof: three dives (the calculation, the label, the aisle). |
-| 70–85 s | Reveal + payoff: pull out to the whole moment at the shelf, then Confirm and the tick. |
+| 70–85 s | Reveal + payoff: pull out to the whole moment at the shelf, then Plan it in and the tick. |
 | 85–100 s | No-bank question. |
 | 100–112 s | Trust. |
 | 112–120 s | End card. |

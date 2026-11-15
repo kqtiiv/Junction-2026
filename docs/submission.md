@@ -19,48 +19,41 @@ AI Glasses for Everyone, Everyday
 ## Description (max 5000, markdown)
 
 ### The problem
-Money decisions happen in the shop aisle; banking apps show them afterwards. By the time you've opened the app and found your balance, you've already paid. Glasses can help in the moment, but a money assistant you wear must earn trust: no invented numbers, no always-on camera, no moving money on its own.
+Money decisions happen in the shop aisle; banking apps show them afterwards. Glasses can help in the moment, but a money assistant you wear must earn trust: no invented numbers, no guessing, no always-on camera, no moving money on its own.
 
 ### What Spendtacles does
-Spendtacles turns Ray-Ban Meta glasses and your phone into a hands-free money coach.
+1. Look at a price label and ask **"Can I afford this?"** (or *"Onko minulla varaa tähän?"*). The glasses take one photo, only because you asked.
+2. You hear: *"If that price is 79.90, it fits, but it would leave about 10 euros until Sunday. Want me to plan it in?"*
+3. Your phone shows what buying it leaves you, and your options: **buy now**, **wait** or **skip**, all from the same numbers.
+4. Tap **Receipt** to see why. The Purchase Receipt lists every figure and its source: the price the camera read (91 % sure), the money available, the bills taken off first, the calculation (`90.16 − 79.90 = 10.26`), what's left, and how fresh the data is. **Check this receipt again** has the server re-verify it.
+5. Tap **Plan it in**, **Wait** or **Skip**. Nothing happens until you choose. "Forget my decisions" deletes what it remembered.
 
-1. Look at a price label and ask **"Can I afford this?"** or **"Does this fit my week?"** You can ask in English or Finnish (*"Onko minulla varaa tähän?"*).
-2. The glasses take one photo, only because you asked. The price is read from the label.
-3. You hear a short answer, for example: *"If that price is 79.90, it fits, but it would leave about 10 euros until Sunday. Want me to plan it in?"*
-4. Your phone shows the card behind the answer. Every row carries a label that says where it came from:
-   - **read by camera** for the price on the label;
-   - **fact** or **calculated** for figures from your data;
-   - **estimate** for projections.
-5. Tap Confirm, and the coach adds it to your week. Nothing happens until you say yes, and you can undo it.
+**It refuses to guess.** A smudged label gets *"I can't read that price reliably. Is it 19.90 or 79.90?"* Missing, week-old or conflicting account data, or an unknown bill: no verdict, and it says why.
 
-**No bank connected?** The coach asks one question the first time it needs one: *"How much do you want to spend until Sunday?"* Say "about a hundred" and you're set up. It remembers the amount, and every answer is labelled "as you told me". You can also use Spendtacles from the phone alone, without the glasses.
+**No bank connected?** It asks once, *"How much do you want to spend until Sunday?"*, and labels every answer "as you told me".
 
 ### Built to be trusted
-- **The AI never invents numbers.** Every figure comes from a deterministic finance engine and carries a calculation ID. Before anything is spoken or shown, a verifier checks each number against the engine's log and drops any number the engine didn't calculate.
-- **No action without confirmation.** Changes are proposals. Each confirmation is signed, single-use, expiring and checked on the server. Kinds of action that move money (payments, transfers, purchases, loans) are rejected by the contract itself.
-- **The camera works only when you ask.** There is no always-on camera and no face recognition. Before a photo leaves the phone, it is rotated upright, stripped of EXIF and GPS data, and downscaled. The coach receives the price read from the label, not the photo, and price-label photos are kept for 0 seconds.
-- **Consent is fail-closed.** Without consent, no finance turn runs. Revoking consent deletes the captures made under it.
-
-### A platform, not a one-off demo
-Every capability implements one stable interface; the money coach is the first, built without touching glasses code. Every message follows a versioned JSON Schema contract with generated TypeScript, Swift, Kotlin and Python types. The trust rules live in the schemas, and every example message runs as a test.
+- **Show me why:** the platform signs each receipt only after every figure on it matches the money engine's calculation log. Change one number and verification fails.
+- **Asks or abstains, never guesses:** deterministic rules, not a model, decide when the data can't support a verdict. Our evaluation: 19 synthetic scenarios, 15 critical, **0 false-safe answers**. Turning the rules off makes it fail.
+- **No invented numbers:** every spoken or shown figure must trace to a calculation ID.
+- **No action without confirmation:** signed, single-use, expiring. Money-moving actions are rejected by the contract.
+- **Camera only when you ask:** EXIF and GPS stripped; the coach gets the price, not the photo, and the photo is kept for 0 seconds.
+- **Consent is fail-closed;** revoking it deletes the captures made under it.
 
 ### Engineering we can show
-- **Backend** (TypeScript, Fastify) handles sessions, glasses device state, consent, photo capture, streamed answers and signed confirmations. All 63 tests pass.
-- **Money engine** (Python, from our teammate) runs on the Junction 2026 synthetic transaction dataset. It answers until payday, and its figures come back as decimal strings with calculation IDs. In the team's two-year backtest, the safe-to-spend rule cut overdraft days by 89%.
-- **iOS companion** (Swift, SwiftUI): glasses session, Bluetooth audio, speech, capture and cards, with unit tests and an end-to-end smoke test.
-- **Meta Wearables Device Access Toolkit 1.0.1**: CI builds the app on macOS runners and drives the whole flow (look, hear, confirm, updated week) on Meta's Mock Device Kit. It passes and saves screenshots.
-- **26 recorded architecture decisions**, each with alternatives, evidence and the conditions for revisiting it.
+- **Backend** (TypeScript, Fastify): orchestrator, consent, capture, trust gate, signed receipts and verification, decision memory. 83 tests pass.
+- **Evaluation harness** (`npm run eval`): false-safe answers, abstention, receipt verification, latency. CI fails on any false-safe answer.
+- **Money engine** (Python, from our teammate) on the Junction 2026 synthetic dataset; in the team's two-year backtest, its safe-to-spend rule cut overdraft days by 89%.
+- **iOS companion** (Swift, SwiftUI) on **Meta Wearables DAT 1.0.1**: CI drives the whole flow on Meta's Mock Device Kit, including opening the receipt and re-verifying it against the server.
+- **Versioned JSON Schema contracts** with generated TypeScript, Swift, Kotlin and Python types; **32 recorded architecture decisions**.
 
 ### What's real and what's mocked
-- **Real:** orchestrator, consent, capture pipeline, confirmation signing, number verification, contracts, no-bank mode, iOS companion, and the team's money engine on the synthetic dataset.
-- **Mocked:**
-  - The label reader returns the demo price label.
-  - With the engine, "today" is a fixed date in the synthetic dataset (2026-09-05), and the answers say so.
-  - The default demo uses fixture numbers, which are marked as mock in the app.
-- **On real glasses:** **[CHECK: e.g. "capture and spoken answer verified on Ray-Ban Meta", otherwise "demonstrated with Meta's Mock Device Kit"]**. "Hey Meta" launch and glasses-tap confirmation are experimental in Meta's SDK, so they sit behind flags and each has a fallback.
+- **Real:** everything above, plus no-bank mode and the team's engine on the synthetic dataset.
+- **Mocked:** the label reader is scripted (the demo label, or a smudged one); there is no OCR model, so OCR accuracy isn't measured. Abstention scenarios and the default numbers are synthetic fixtures, labelled as such in the app. With the engine, "today" is a simulated date.
+- **On real glasses:** **[CHECK: "verified on Ray-Ban Meta" or "demonstrated with Meta's Mock Device Kit"]**. "Hey Meta" launch and glasses-tap confirmation are experimental in Meta's SDK, so they sit behind flags with fallbacks.
 
 ### What's next
-Real bank data through a PSD2 sandbox, a real label reader, receipt matching, a language model that explains the engine's figures but never calculates them, and more capabilities on the same platform.
+Real bank data (PSD2), a real label reader measured on labelled photos, receipts and decisions kept beyond a session, matching shop receipts to decisions, and more capabilities on the same platform.
 
 ### Tech
 Swift · SwiftUI · Meta Wearables DAT 1.0.1 · Python · FastAPI · DuckDB · TypeScript · Node 22 · Fastify · JSON Schema (Ajv) · quicktype · ES256 JWS · GitHub Actions (macOS + Mock Device Kit) · Fly.io
@@ -74,7 +67,7 @@ Swift · SwiftUI · Meta Wearables DAT 1.0.1 · Python · FastAPI · DuckDB · T
 | Source Code | https://github.com/kqtiiv/Spendtacles |
 | Project Demo | **[CHECK]** The deployed backend (`https://junction26-coach.fly.dev/health`) wasn't responding when checked. Leave blank, or link the CI screenshots / a demo recording. |
 | Video | **[TODO]** Record it (see the plan in chat) and upload it to YouTube (unlisted) or Loom |
-| Other Link | https://github.com/kqtiiv/Spendtacles/blob/main/docs/ARCHITECTURE_DECISION_LOG.md |
+| Other Link | https://github.com/kqtiiv/Spendtacles/blob/main/docs/eval/RESULTS.md (evaluation results; decisions in docs/ARCHITECTURE_DECISION_LOG.md) |
 | Presentation | **[TODO]** PDF deck |
 
 ## Tech challenges

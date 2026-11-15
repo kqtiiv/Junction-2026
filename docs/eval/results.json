@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-15T05:31:56.312Z",
+  "generated_at": "2026-11-15T07:14:48.900Z",
   "node": "v24.12.0",
   "data": "synthetic (fixture finance data, scripted label readings)",
   "metrics": {
@@ -20,9 +20,9 @@
     "tamper_checks_correct": 2,
     "completion_rate": 1,
     "latency_ms": {
-      "p50": 1.4,
-      "p95": 11,
-      "max": 50.3,
+      "p50": 1.8,
+      "p95": 52.3,
+      "max": 74.7,
       "turns": 23
     },
     "ocr_accuracy": null
@@ -41,7 +41,7 @@
           "falseSafe": false,
           "pass": true,
           "overAbstained": false,
-          "latencyMs": 50.3
+          "latencyMs": 74.7
         }
       ],
       "receiptsChecked": 1,
@@ -61,7 +61,7 @@
           "pass": true,
           "shouldHoldBack": true,
           "heldBack": true,
-          "latencyMs": 2.1
+          "latencyMs": 3.9
         },
         {
           "step": "say “It's 79.90”",
@@ -70,7 +70,7 @@
           "falseSafe": false,
           "pass": true,
           "overAbstained": false,
-          "latencyMs": 2.6
+          "latencyMs": 2.8
         }
       ],
       "receiptsChecked": 2,
@@ -90,7 +90,7 @@
           "pass": true,
           "shouldHoldBack": true,
           "heldBack": true,
-          "latencyMs": 1.1
+          "latencyMs": 1.9
         },
         {
           "step": "say “yes”",
@@ -138,7 +138,7 @@
           "falseSafe": false,
           "pass": true,
           "overAbstained": false,
-          "latencyMs": 1.7
+          "latencyMs": 2.1
         }
       ],
       "receiptsChecked": 1,
@@ -158,7 +158,7 @@
           "pass": true,
           "shouldHoldBack": true,
           "heldBack": true,
-          "latencyMs": 1.5
+          "latencyMs": 1.8
         }
       ],
       "receiptsChecked": 1,
@@ -178,7 +178,7 @@
           "pass": true,
           "shouldHoldBack": true,
           "heldBack": true,
-          "latencyMs": 1.7
+          "latencyMs": 2.4
         }
       ],
       "receiptsChecked": 1,
@@ -197,7 +197,7 @@
           "falseSafe": false,
           "pass": true,
           "overAbstained": false,
-          "latencyMs": 2.4
+          "latencyMs": 1.9
         }
       ],
       "receiptsChecked": 1,
@@ -217,7 +217,7 @@
           "pass": true,
           "shouldHoldBack": true,
           "heldBack": true,
-          "latencyMs": 1.3
+          "latencyMs": 2.6
         }
       ],
       "receiptsChecked": 1,
@@ -237,7 +237,7 @@
           "pass": true,
           "shouldHoldBack": true,
           "heldBack": true,
-          "latencyMs": 1
+          "latencyMs": 1.8
         }
       ],
       "receiptsChecked": 1,
@@ -257,7 +257,7 @@
           "pass": true,
           "shouldHoldBack": true,
           "heldBack": true,
-          "latencyMs": 1
+          "latencyMs": 1.3
         }
       ],
       "receiptsChecked": 1,
@@ -276,7 +276,7 @@
           "falseSafe": false,
           "pass": true,
           "overAbstained": false,
-          "latencyMs": 1.2
+          "latencyMs": 1.4
         },
         {
           "step": "tap confirm",
@@ -292,7 +292,7 @@
           "falseSafe": false,
           "pass": true,
           "overAbstained": false,
-          "latencyMs": 1.5
+          "latencyMs": 1.4
         }
       ],
       "receiptsChecked": 2,
@@ -311,7 +311,7 @@
           "falseSafe": false,
           "pass": true,
           "overAbstained": false,
-          "latencyMs": 1.3
+          "latencyMs": 2.2
         },
         {
           "step": "verify intact receipt",
@@ -341,7 +341,7 @@
           "falseSafe": false,
           "pass": true,
           "overAbstained": false,
-          "latencyMs": 1.4
+          "latencyMs": 1.5
         },
         {
           "step": "verify tampered receipt",
@@ -371,7 +371,7 @@
           "falseSafe": false,
           "pass": true,
           "overAbstained": false,
-          "latencyMs": 1.4
+          "latencyMs": 2.4
         },
         {
           "step": "tap reject",
@@ -404,7 +404,7 @@
           "falseSafe": false,
           "pass": true,
           "overAbstained": false,
-          "latencyMs": 1.1
+          "latencyMs": 1.4
         },
         {
           "step": "say “I'll wait”",
@@ -412,7 +412,7 @@
           "actual": "other",
           "falseSafe": false,
           "pass": true,
-          "latencyMs": 11
+          "latencyMs": 52.3
         },
         {
           "step": "tap confirm",
@@ -456,7 +456,7 @@
           "falseSafe": false,
           "pass": true,
           "overAbstained": false,
-          "latencyMs": 1.4
+          "latencyMs": 1.6
         },
         {
           "step": "tap confirm",

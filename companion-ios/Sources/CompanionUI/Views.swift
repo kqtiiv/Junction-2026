@@ -436,7 +436,10 @@ struct ReceiptSheet: View {
             }
             HStack(spacing: 6) {
                 EpistemicChip(epistemic: line.epistemic)
-                Text("· \(sourceName(line.source.rawValue))").font(.caption).foregroundStyle(Look.slate)
+                // "Read by camera · Camera" says the same thing twice.
+                if !(line.epistemic == .observed && line.source == .camera) {
+                    Text("· \(sourceName(line.source.rawValue))").font(.caption).foregroundStyle(Look.slate)
+                }
             }
             if let note = line.note {
                 Text(Display.text(note, locale: locale)).font(.caption).foregroundStyle(Look.slate)

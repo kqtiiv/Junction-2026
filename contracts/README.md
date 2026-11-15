@@ -43,7 +43,7 @@ contracts/
 │   ├── domain_response_event.schema.json  streamed events (progress | card | proposal | final)
 │   ├── tool_descriptor.schema.json     DeterministicTool   how a domain describes a deterministic function
 │   ├── tool_result.schema.json         ToolResult          envelope every tool returns (calc_id, epistemic, …)
-│   ├── insight_card.schema.json        InsightCard         schema-driven card for phone/glasses display
+│   ├── insight_card.schema.json        InsightCard         schema-driven card for phone/glasses display, with an optional signed Purchase Receipt (DEC-029)
 │   ├── action_proposal.schema.json     ActionProposal      a change the capability wants to make
 │   ├── user_confirmation.schema.json   UserConfirmation    the user's signed decision
 │   ├── action_result.schema.json       ActionResult        what happened after confirmation

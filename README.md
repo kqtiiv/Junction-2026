@@ -14,20 +14,22 @@ These screenshots come from CI, not a mock-up. The UI test runs the real iOS app
 
 <table>
   <tr>
-    <td align="center" width="25%"><img src="companion-ios/App/Resources/demo_price_label.jpg" alt="Demo price label: LANGATTOMAT KUULOKKEET, 79,90 €" width="240"></td>
-    <td align="center" width="25%"><img src="docs/images/1-consent.png" alt="Consent screen: Before we start" width="240"></td>
-    <td align="center" width="25%"><img src="docs/images/2-answer-and-proposal.png" alt="Spoken answer and a proposal to add the purchase to this week's planned spending" width="240"></td>
-    <td align="center" width="25%"><img src="docs/images/3-confirmed.png" alt="Confirmed: 10,26 € safe to spend this week" width="240"></td>
+    <td align="center" width="20%"><img src="companion-ios/App/Resources/demo_price_label.jpg" alt="Demo price label: LANGATTOMAT KUULOKKEET, 79,90 €" width="190"></td>
+    <td align="center" width="20%"><img src="docs/images/1-consent.png" alt="Consent screen: Before we start" width="190"></td>
+    <td align="center" width="20%"><img src="docs/images/2-answer.png" alt="The answer: Langattomat kuulokkeet, 10,26 € left until Sunday after buying, with the receipt link and Plan it in / Wait / Skip" width="190"></td>
+    <td align="center" width="20%"><img src="docs/images/3-receipt-verified.png" alt="The Purchase Receipt, verified just now: every line with its source, the calculation 90.16 − 79.90 = 10.26, and the verdict rule" width="190"></td>
+    <td align="center" width="20%"><img src="docs/images/4-confirmed.png" alt="Confirmed: 10,26 € safe to spend this week, with its own signed receipt" width="190"></td>
   </tr>
   <tr>
     <td valign="top"><b>0. What the glasses see.</b> The simulated camera is fed this price label.</td>
-    <td valign="top"><b>1. Consent first.</b> No finance turn runs without a grant. Photos are deleted as soon as the price is read.</td>
-    <td valign="top"><b>2. Answer + proposal.</b> <i>"If that price is 79.90, it fits, but it would leave about 10 euros until Sunday. Want me to plan it in?"</i> The proposal shows the before and after, and waits.</td>
-    <td valign="top"><b>3. Confirmed.</b> One explicit tap, and the card updates to the new figure. Every value is labelled <i>fact</i>, <i>estimate</i>, <i>calculated</i> or <i>read by camera</i>.</td>
+    <td valign="top"><b>1. Consent first.</b> What's used, what's remembered, and that nothing is bought for you.</td>
+    <td valign="top"><b>2. The answer.</b> <i>"If that price is 79.90, it fits, but it would leave about 10 euros until Sunday. Want me to plan it in?"</i> The card is about the item. Plan it in, wait or skip.</td>
+    <td valign="top"><b>3. Show me why.</b> The Purchase Receipt: every figure, where it came from, what's uncertain. "Check this receipt again" has the server re-verify it.</td>
+    <td valign="top"><b>4. Confirmed.</b> One explicit tap. The updated week comes back with its own signed receipt.</td>
   </tr>
 </table>
 
-The dark strip under the title (`glasses: mock · mode: glasses · seq …`) is the debug overlay. It is there on purpose: **mocks are never silent** (DEC-005), so the app always shows when simulated glasses or fixture data are in play.
+The header pill says **Simulated** and the grey strip at the end (`glasses: mock · mode: glasses · seq …`) is the debug overlay. Both are there on purpose: **mocks are never silent** (DEC-005), so the app always shows when simulated glasses or fixture data are in play. Receipts say **Synthetic data** for the same reason.
 
 ## Show me why
 

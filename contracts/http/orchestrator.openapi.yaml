@@ -209,3 +209,58 @@ paths:
           content:
             application/json:
               schema: { $ref: "../schemas/v1/error_envelope.schema.json" }
+  /v1/receipts/verify:
+    post:
+      summary: Re-check a card's receipt independently (DEC-029)
+      description: |
+        The client sends a card back exactly as it received it. The platform recomputes the card's
+        digest (canonical JSON without `receipt.verification`), checks the ES256 signature over
+        {card_id, digest, calc_ids, status, signed_at}, and asks the card's capability to re-match
+        every figure against this user's calculation log. Observed figures are matched against the
+        user's stored observations. Another user's receipt does not verify against your log.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [card]
+              properties:
+                card: { $ref: "../schemas/v1/insight_card.schema.json" }
+      responses:
+        "200":
+          description: The result of the check (a failed check is still a 200)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [valid, signature_valid, digest_matches, grounded, unverified]
+                properties:
+                  valid: { type: boolean, description: "signature_valid && digest_matches && grounded" }
+                  signature_valid: { type: boolean }
+                  digest_matches: { type: boolean }
+                  grounded: { type: boolean, description: Every figure matches a logged calculation or a stored observation }
+                  checked_values: { type: integer }
+                  unverified: { type: array, items: { type: string } }
+                  key_id: { type: string }
+                  reason: { type: string, enum: [UNSIGNED, MODIFIED] }
+        "400":
+          description: No card, or a card without a receipt
+          content:
+            application/json:
+              schema: { $ref: "../schemas/v1/error_envelope.schema.json" }
+  /v1/receipts/public-key:
+    get:
+      summary: The platform's receipt-signing public key
+      responses:
+        "200":
+          description: ES256 public key
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [key_id, alg, public_key_pem]
+                properties:
+                  key_id: { type: string }
+                  alg: { const: ES256 }
+                  public_key_pem: { type: string }

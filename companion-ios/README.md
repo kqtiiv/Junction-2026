@@ -80,7 +80,7 @@ Already set, nothing to change: the `sbankcoach://` URL scheme that Meta AI uses
 
 ## Run without glasses (and without a Mac): CI on GitHub's macOS runners
 
-`.github/workflows/ios.yml` builds everything on a macOS runner and runs the app in the iOS Simulator with Meta's **Mock Device Kit** (simulated Ray-Ban Meta glasses inside the real DAT SDK). The UI test walks through consent → connect glasses → "does this fit my week?" → answer card → confirm, and uploads screenshots of each step as the `ios-screenshots` artifact.
+`.github/workflows/ios.yml` builds everything on a macOS runner and runs the app in the iOS Simulator with Meta's **Mock Device Kit** (simulated Ray-Ban Meta glasses inside the real DAT SDK). The UI test walks through consent → connect glasses → "does this fit my week?" → answer card → open the Purchase Receipt → **Check this receipt again** (the backend re-verifies it) → Plan it in → updated week, and uploads screenshots of each step as the `ios-screenshots` artifact.
 
 The Xcode project is generated from `Xcode/project.yml` with XcodeGen and has two app targets:
 
@@ -101,6 +101,10 @@ BACKEND_URL=http://localhost:8787 swift run companion-smoke
 ```
 
 ## Design notes
+
+- **Look** (DEC-027): one bold element, the answer's figure on a shelf-price-tag yellow, on a quiet aisle-white ground with spruce ink; system fonts; dark mode. The decision (Plan it in / Wait / Skip) docks above the input bar in one compact row so it never covers the card, and the receipt link sits right under the price tag.
+- **Purchase Receipt** (DEC-029): `ReceiptSheet` shows every line with its kind and source, the reasons for caveats or no verdict, data freshness and the proof. The coordinator keeps each card's JSON exactly as received (`TurnOutcome.rawCards`) and **Check this receipt again** sends that back to `POST /v1/receipts/verify`; re-encoding through Codable could change dates and break the signed digest.
+- **Follow-ups** (DEC-030/031): the answer's `followups` become chips ("It's 19.90", "I'll wait"); before the first question, two starters show instead.
 
 - **Mocks are never silent** (DEC-005): `MockGlassesBridge` reports `glasses_backend: mock`, and the debug overlay always shows it.
 - **The user starts every capture.** A photo is only taken when the user's own words ask about "this / tämä / den här", and only in glasses mode.

@@ -37,7 +37,7 @@ audience: Junction 2026 judges
 
 - status: built
 - duration: 8s
-- scene: Right: thumb taps Confirm (F2), “Done. You can undo it on your phone.” Left: “still checking…”.
+- scene: Right: thumb taps Plan it in (F2), “Done. You can undo it on your phone.” Left: “still checking…”.
 - reads: "Done. You can undo it on your phone." (24.0-27.0s); "still checking…" (27.0-29.5s)
 - sound: click on the tap; left clatter peaks
 - poster: 26
@@ -91,9 +91,9 @@ audience: Junction 2026 judges
 
 - status: built
 - duration: 8s
-- scene: The real confirm sheet. The thumb lands on Confirm, with a click.
-- reads: sheet rows (71.5-76s); Confirm tapped (77s)
-- sound: click on Confirm
+- scene: The real decision panel (docked above the input bar since 2026-11-15). The thumb lands on Plan it in, with a click.
+- reads: panel rows (71.5-76s); Plan it in tapped (77s)
+- sound: click on Plan it in
 - poster: 77
 
 ## Frame 11: The week ticks down (79-90s)

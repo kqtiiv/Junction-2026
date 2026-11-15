@@ -39,7 +39,7 @@ TIME: 120 s × 30 = 3600 frames (range 110–120 s). The music sets the clock. T
 
 ### Accent and chips
 - **The one accent is iOS blue #0A84FF.** It appears only on:
-  - the Confirm button;
+  - the "Plan it in" button (was "Confirm");
   - the ticking number while it ticks;
   - the end-card call to action.
 - **Evidence chips** use the app's own colours. Each chip is text on a 14% tint of its colour, with a pill radius, because that is how the app draws them.
@@ -65,7 +65,8 @@ TIME: 120 s × 30 = 3600 frames (range 110–120 s). The music sets the clock. T
 | **The shelf tag** | The real demo label, LANGATTOMAT KUULOKKEET 79,90 €: a red header band and black price on white. It is the bridge between the footage and the UI, and "79,90 €" is the one piece of data that travels through the film. |
 | **The phone** | Only its screen content, rebuilt from the real app (no device frame). In the left-hand footage it is the shopper's own phone, filmed. |
 | **The glasses** | Real Ray-Ban Meta in your footage only. Never drawn. |
-| **The confirm sheet** | Rebuilt with its exact labels: "Add “Langattomat kuulokkeet” to this week's planned spending?", "Price (read from the label) 79,90 €", "Safe to spend this week 90,16 € → 10,26 €", "You can undo this later.", "Not now" and "Confirm". |
+| **The decision panel** (was the confirm sheet; the app changed on 2026-11-15, DEC-027/031) | Rebuilt with its exact labels: "Add “Langattomat kuulokkeet” to this week's planned spending?", "Safe to spend this week 90,16 € → 10,26 €", the buttons "Plan it in", "Wait" and "Skip", and "Nothing is bought or paid. You can undo this later." It docks above the input bar instead of sliding up as a sheet. Reference: `docs/images/2-answer.png`. |
+| **The Purchase Receipt** (new, DEC-029) | Optional proof beat: the receipt sheet with "Verified just now: signature, contents and every figure match." and the line `90.16 − 79.90 = 10.26`. Reference: `docs/images/3-receipt-verified.png`. Not yet placed in the timeline. |
 | **The answer** | The real sentence: “If that price is 79.90, it fits, but it would leave about 10 euros until Sunday. Want me to plan it in?” |
 
 ## MOTION
@@ -97,13 +98,13 @@ TIME: 120 s × 30 = 3600 frames (range 110–120 s). The music sets the clock. T
 | 01 | 0–6 s (0–180) | Hard split, both panes live from frame 0. | "Same shelf. Same 79,90 €." across the seam (0.4–3.0 s). | Room tone. The bed enters on bar 1. | – |
 | 02 | 6–14 s | **Left (L):** unlock → bank app → account list, a cut every 18 frames. **Right (R):** the glasses look at the tag (F1). | **R:** "does this fit my week?" types on under the tag (6.5–9.5 s). | **L:** phone UI clicks. **R:** silence under the bed. | – |
 | 03 | 14–22 s | **L:** scrolling a transaction list (placeholder footage). **R:** the answer, as captions with a waveform. | **R:** the real sentence in two lines, (14.4–17.4 s) and (17.6–21.4 s). | **L:** clicks build. | – |
-| 04 | 22–30 s | **R:** F2, a thumb taps Confirm and "Done." lands. **L:** still scrolling. | **R:** "Done. You can undo it on your phone." (24.0–27.0 s). **L:** "still checking…" (27.0–29.5 s). | Click on the tap. **L** clatter peaks. | – |
+| 04 | 22–30 s | **R:** F2, a thumb taps Plan it in and "Done." lands. **L:** still scrolling. | **R:** "Done. You can undo it on your phone." (24.0–27.0 s). **L:** "still checking…" (27.0–29.5 s). | Click on the tap. **L** clatter peaks. | – |
 | 05 | 30–33 s | The seam pushes left and the left pane leaves frame (24 frames). | – | **L** goes silent on the push. Whoosh. | The right pane fills the frame. |
 | 06 | 33–39 s | Reveal: a dark card with "Spendtacles" at 180 px, wiped in from the left edge. | "Spendtacles" (33.4–36 s). "Ask while you're still at the shelf" (36–38.8 s). | Bed lifts a bar. | The tag on the right pane becomes shot 07. |
 | 07 | 39–49 s | **Look.** The tag at 1.8×. "79,90 €" lifts off the tag, and the purple "read by camera" chip pops. | "It reads the label" (39.5–42 s). "79,90 € · read by camera" (42–48 s). | Pop on the chip. | – |
 | 08 | 49–61 s | **Ask + hear.** Glasses footage behind, with the sentence typed on in big type, word by word. | "If that price is 79.90, it fits…" (49.5–54 s). "…but it would leave about 10 euros until Sunday." (54–58.5 s). | Soft key ticks. | "about 10 euros" turns into the card number. |
 | 09 | 61–71 s | **Check.** The answer card: "Does it fit this week?", 10,26 € and the estimate chip. | "Does it fit this week? 10,26 €" (61.5–65 s). "Every number checked against the calculation" (65–70 s). | Pop on the chip. | – |
-| 10 | 71–79 s | **Tap.** The confirm sheet slides up and the cursor-thumb taps Confirm. | The sheet's rows (71.5–76 s). Confirm is tapped (77 s). | Click on Confirm. | – |
+| 10 | 71–79 s | **Tap.** The decision panel docks up and the cursor-thumb taps Plan it in. | The panel's rows (71.5–76 s). Plan it in is tapped (77 s). | Click on Plan it in. | – |
 | 11 | 79–90 s | **Payoff.** 90,16 € ticks to 10,26 € at 220 px, then "Done. You can undo it on your phone." | The tick (79.5–81 s), the result holds (81–85 s), then "Done…" (85–89 s). | Riser into impact on the settle (once in the film). | – |
 | 12 | 90–104 s | **No bank connected?** The phone asks: "How much do you want to spend until Sunday?" → "about a hundred" → "Got it: 100 euros until Sunday. If the label's right, that leaves about 20." | Four lines, one at a time, at 3.0–3.5 s each. | Key ticks. | – |
 | 13 | 104–112 s | **Trust.** One line per beat, each on its real chip or label. | "Every number is checked" → "The photo is deleted" → "You say yes first" → "It never moves money" (2 s each). | Pop per chip. | – |

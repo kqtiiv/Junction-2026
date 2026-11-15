@@ -3,6 +3,8 @@
 *Junction 2026 · Platform design v1.1 · updated 2026-11-14*
 
 > **Since DEC-026 (2026-11-14), S-Bank is not part of the project.** Wherever this document says "S-Bank Coach", read **the money coach**: the finance capability built on our teammate's engine. Internal identifiers (`sbank.coach`, `SBankCoachAdapter`, `s_pankki`) keep the old name until a rename after the hackathon. S-Bank-specific plans (S-Pankki PSD2 sandbox, S Group receipts) are out of scope.
+
+> **Since DEC-029 to DEC-032 (2026-11-15):** answer cards carry a **Purchase Receipt** (`InsightCard.receipt`) that the platform signs only after the grounding verifier passes, and `POST /v1/receipts/verify` re-checks it independently. A deterministic **trust gate** in the money coach asks about unclear labels and gives no verdict when account data can't support one. Each verdict comes with **buy now / wait / skip** options, and decisions are remembered per user until deleted. `backend/eval/` measures false-safe answers, abstention and verification on synthetic scenarios (`docs/eval/RESULTS.md`).
 >
 > **Document map:**
 > - **This document** is the platform architecture.
