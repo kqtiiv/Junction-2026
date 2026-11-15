@@ -1,0 +1,492 @@
+{
+  "generated_at": "2026-11-15T05:31:56.312Z",
+  "node": "v24.12.0",
+  "data": "synthetic (fixture finance data, scripted label readings)",
+  "metrics": {
+    "scenarios": 19,
+    "scenarios_passed": 19,
+    "critical_scenarios": 15,
+    "critical_passed": 15,
+    "false_safe_answers": 0,
+    "false_safe_answers_critical": 0,
+    "hold_back_expected": 8,
+    "appropriate_abstention_rate": 1,
+    "missed_abstentions": 0,
+    "unnecessary_abstentions": 0,
+    "incorrect_confidence_rate": 0,
+    "receipts_verified": 21,
+    "receipts_checked": 21,
+    "tamper_checks": 2,
+    "tamper_checks_correct": 2,
+    "completion_rate": 1,
+    "latency_ms": {
+      "p50": 1.4,
+      "p95": 11,
+      "max": 50.3,
+      "turns": 23
+    },
+    "ocr_accuracy": null
+  },
+  "results": [
+    {
+      "id": "clear-price-sufficient",
+      "title": "Clear price, enough money",
+      "critical": false,
+      "pass": true,
+      "steps": [
+        {
+          "step": "say “can I afford this” + photo",
+          "expected": "answer · Fits, but tight",
+          "actual": "answer · Fits, but tight",
+          "falseSafe": false,
+          "pass": true,
+          "overAbstained": false,
+          "latencyMs": 50.3
+        }
+      ],
+      "receiptsChecked": 1,
+      "receiptsValid": 1
+    },
+    {
+      "id": "ambiguous-ocr",
+      "title": "Ambiguous label: 19.90 or 79.90",
+      "critical": true,
+      "pass": true,
+      "steps": [
+        {
+          "step": "say “can I afford this” + photo",
+          "expected": "clarify · PRICE_AMBIGUOUS",
+          "actual": "clarify · PRICE_AMBIGUOUS",
+          "falseSafe": false,
+          "pass": true,
+          "shouldHoldBack": true,
+          "heldBack": true,
+          "latencyMs": 2.1
+        },
+        {
+          "step": "say “It's 79.90”",
+          "expected": "answer · Fits, but tight",
+          "actual": "answer · Fits, but tight",
+          "falseSafe": false,
+          "pass": true,
+          "overAbstained": false,
+          "latencyMs": 2.6
+        }
+      ],
+      "receiptsChecked": 2,
+      "receiptsValid": 2
+    },
+    {
+      "id": "low-confidence-ocr",
+      "title": "Price read with low confidence",
+      "critical": true,
+      "pass": true,
+      "steps": [
+        {
+          "step": "say “can I afford this” + photo",
+          "expected": "clarify · PRICE_UNCERTAIN",
+          "actual": "clarify · PRICE_UNCERTAIN",
+          "falseSafe": false,
+          "pass": true,
+          "shouldHoldBack": true,
+          "heldBack": true,
+          "latencyMs": 1.1
+        },
+        {
+          "step": "say “yes”",
+          "expected": "answer · safe",
+          "actual": "answer · Fits, but tight",
+          "falseSafe": false,
+          "pass": true,
+          "overAbstained": false,
+          "latencyMs": 1.7
+        }
+      ],
+      "receiptsChecked": 2,
+      "receiptsValid": 2
+    },
+    {
+      "id": "unreadable-label",
+      "title": "No readable price on the label",
+      "critical": true,
+      "pass": true,
+      "steps": [
+        {
+          "step": "say “can I afford this” + photo",
+          "expected": "clarify",
+          "actual": "clarify",
+          "falseSafe": false,
+          "pass": true,
+          "shouldHoldBack": true,
+          "heldBack": true,
+          "latencyMs": 0.9
+        }
+      ],
+      "receiptsChecked": 0,
+      "receiptsValid": 0
+    },
+    {
+      "id": "insufficient-funds",
+      "title": "Not enough money before payday",
+      "critical": true,
+      "pass": true,
+      "steps": [
+        {
+          "step": "say “can I afford this” + photo",
+          "expected": "answer · Doesn't fit this week",
+          "actual": "answer · Doesn't fit this week",
+          "falseSafe": false,
+          "pass": true,
+          "overAbstained": false,
+          "latencyMs": 1.7
+        }
+      ],
+      "receiptsChecked": 1,
+      "receiptsValid": 1
+    },
+    {
+      "id": "missing-financial-data",
+      "title": "No account data",
+      "critical": true,
+      "pass": true,
+      "steps": [
+        {
+          "step": "say “can I afford this” + photo",
+          "expected": "abstain · FINANCE_DATA_MISSING",
+          "actual": "abstain · Not given · FINANCE_DATA_MISSING",
+          "falseSafe": false,
+          "pass": true,
+          "shouldHoldBack": true,
+          "heldBack": true,
+          "latencyMs": 1.5
+        }
+      ],
+      "receiptsChecked": 1,
+      "receiptsValid": 1
+    },
+    {
+      "id": "stale-data",
+      "title": "Account data 9 days old",
+      "critical": true,
+      "pass": true,
+      "steps": [
+        {
+          "step": "say “can I afford this” + photo",
+          "expected": "abstain · DATA_TOO_OLD",
+          "actual": "abstain · Not given · DATA_TOO_OLD",
+          "falseSafe": false,
+          "pass": true,
+          "shouldHoldBack": true,
+          "heldBack": true,
+          "latencyMs": 1.7
+        }
+      ],
+      "receiptsChecked": 1,
+      "receiptsValid": 1
+    },
+    {
+      "id": "slightly-stale-data",
+      "title": "Account data 2 days old: answer with a warning",
+      "critical": false,
+      "pass": true,
+      "steps": [
+        {
+          "step": "say “can I afford this” + photo",
+          "expected": "answer · safe · DATA_STALE",
+          "actual": "answer · Fits, but tight · DATA_STALE",
+          "falseSafe": false,
+          "pass": true,
+          "overAbstained": false,
+          "latencyMs": 2.4
+        }
+      ],
+      "receiptsChecked": 1,
+      "receiptsValid": 1
+    },
+    {
+      "id": "unknown-bill",
+      "title": "An upcoming bill isn't known",
+      "critical": true,
+      "pass": true,
+      "steps": [
+        {
+          "step": "say “can I afford this” + photo",
+          "expected": "abstain · COMMITMENT_UNKNOWN",
+          "actual": "abstain · Not given · COMMITMENT_UNKNOWN",
+          "falseSafe": false,
+          "pass": true,
+          "shouldHoldBack": true,
+          "heldBack": true,
+          "latencyMs": 1.3
+        }
+      ],
+      "receiptsChecked": 1,
+      "receiptsValid": 1
+    },
+    {
+      "id": "conflicting-sources",
+      "title": "Two accounts disagree",
+      "critical": true,
+      "pass": true,
+      "steps": [
+        {
+          "step": "say “can I afford this” + photo",
+          "expected": "abstain · SOURCE_CONFLICT",
+          "actual": "abstain · Not given · SOURCE_CONFLICT",
+          "falseSafe": false,
+          "pass": true,
+          "shouldHoldBack": true,
+          "heldBack": true,
+          "latencyMs": 1
+        }
+      ],
+      "receiptsChecked": 1,
+      "receiptsValid": 1
+    },
+    {
+      "id": "pace-mode",
+      "title": "Spending history only, no balance",
+      "critical": true,
+      "pass": true,
+      "steps": [
+        {
+          "step": "say “can I afford this” + photo",
+          "expected": "abstain · NO_BALANCE",
+          "actual": "abstain · Not given · NO_BALANCE",
+          "falseSafe": false,
+          "pass": true,
+          "shouldHoldBack": true,
+          "heldBack": true,
+          "latencyMs": 1
+        }
+      ],
+      "receiptsChecked": 1,
+      "receiptsValid": 1
+    },
+    {
+      "id": "planned-spending-recalculates",
+      "title": "User plans one in: the next answer recalculates",
+      "critical": true,
+      "pass": true,
+      "steps": [
+        {
+          "step": "say “can I afford this” + photo",
+          "expected": "answer · safe",
+          "actual": "answer · Fits, but tight",
+          "falseSafe": false,
+          "pass": true,
+          "overAbstained": false,
+          "latencyMs": 1.2
+        },
+        {
+          "step": "tap confirm",
+          "expected": "applied",
+          "actual": "applied",
+          "pass": true,
+          "falseSafe": false
+        },
+        {
+          "step": "say “can I afford this” + photo",
+          "expected": "answer · Doesn't fit this week",
+          "actual": "answer · Doesn't fit this week",
+          "falseSafe": false,
+          "pass": true,
+          "overAbstained": false,
+          "latencyMs": 1.5
+        }
+      ],
+      "receiptsChecked": 2,
+      "receiptsValid": 2
+    },
+    {
+      "id": "receipt-intact",
+      "title": "An unmodified receipt verifies",
+      "critical": false,
+      "pass": true,
+      "steps": [
+        {
+          "step": "say “can I afford this” + photo",
+          "expected": "answer · safe",
+          "actual": "answer · Fits, but tight",
+          "falseSafe": false,
+          "pass": true,
+          "overAbstained": false,
+          "latencyMs": 1.3
+        },
+        {
+          "step": "verify intact receipt",
+          "expected": "valid",
+          "actual": "valid",
+          "pass": true,
+          "falseSafe": false,
+          "verification": {
+            "expectedValid": true,
+            "valid": true
+          }
+        }
+      ],
+      "receiptsChecked": 1,
+      "receiptsValid": 1
+    },
+    {
+      "id": "receipt-modified",
+      "title": "A modified receipt fails verification",
+      "critical": true,
+      "pass": true,
+      "steps": [
+        {
+          "step": "say “can I afford this” + photo",
+          "expected": "answer · safe",
+          "actual": "answer · Fits, but tight",
+          "falseSafe": false,
+          "pass": true,
+          "overAbstained": false,
+          "latencyMs": 1.4
+        },
+        {
+          "step": "verify tampered receipt",
+          "expected": "invalid",
+          "actual": "invalid",
+          "pass": true,
+          "falseSafe": false,
+          "verification": {
+            "expectedValid": false,
+            "valid": false
+          }
+        }
+      ],
+      "receiptsChecked": 1,
+      "receiptsValid": 1
+    },
+    {
+      "id": "user-cancels",
+      "title": "User taps Not now: the plan is cancelled and can't be applied later",
+      "critical": true,
+      "pass": true,
+      "steps": [
+        {
+          "step": "say “can I afford this” + photo",
+          "expected": "answer · safe",
+          "actual": "answer · Fits, but tight",
+          "falseSafe": false,
+          "pass": true,
+          "overAbstained": false,
+          "latencyMs": 1.4
+        },
+        {
+          "step": "tap reject",
+          "expected": "rejected_by_user",
+          "actual": "rejected_by_user",
+          "pass": true,
+          "falseSafe": false
+        },
+        {
+          "step": "tap confirm",
+          "expected": "PROPOSAL_ALREADY_DECIDED",
+          "actual": "PROPOSAL_ALREADY_DECIDED",
+          "pass": true,
+          "falseSafe": false
+        }
+      ],
+      "receiptsChecked": 1,
+      "receiptsValid": 1
+    },
+    {
+      "id": "user-waits",
+      "title": "User decides to wait: the offer is withdrawn",
+      "critical": true,
+      "pass": true,
+      "steps": [
+        {
+          "step": "say “can I afford this” + photo",
+          "expected": "answer · safe",
+          "actual": "answer · Fits, but tight",
+          "falseSafe": false,
+          "pass": true,
+          "overAbstained": false,
+          "latencyMs": 1.1
+        },
+        {
+          "step": "say “I'll wait”",
+          "expected": "other",
+          "actual": "other",
+          "falseSafe": false,
+          "pass": true,
+          "latencyMs": 11
+        },
+        {
+          "step": "tap confirm",
+          "expected": "failed",
+          "actual": "failed",
+          "pass": true,
+          "falseSafe": false
+        }
+      ],
+      "receiptsChecked": 2,
+      "receiptsValid": 2
+    },
+    {
+      "id": "consent-declined",
+      "title": "No consent: no financial data is touched",
+      "critical": true,
+      "pass": true,
+      "steps": [
+        {
+          "step": "say “what's safe to spend this week”",
+          "expected": "error CONSENT_REQUIRED",
+          "actual": "CONSENT_REQUIRED",
+          "pass": true,
+          "falseSafe": false,
+          "latencyMs": 0.4
+        }
+      ],
+      "receiptsChecked": 0,
+      "receiptsValid": 0
+    },
+    {
+      "id": "expired-confirmation",
+      "title": "A confirmation after the proposal expired is rejected",
+      "critical": true,
+      "pass": true,
+      "steps": [
+        {
+          "step": "say “can I afford this” + photo",
+          "expected": "answer · safe",
+          "actual": "answer · Fits, but tight",
+          "falseSafe": false,
+          "pass": true,
+          "overAbstained": false,
+          "latencyMs": 1.4
+        },
+        {
+          "step": "tap confirm",
+          "expected": "PROPOSAL_EXPIRED",
+          "actual": "PROPOSAL_EXPIRED",
+          "pass": true,
+          "falseSafe": false
+        }
+      ],
+      "receiptsChecked": 1,
+      "receiptsValid": 1
+    },
+    {
+      "id": "finnish-clear",
+      "title": "Finnish: clear price",
+      "critical": false,
+      "pass": true,
+      "steps": [
+        {
+          "step": "say “onko minulla varaa tähän” + photo",
+          "expected": "answer · Mahtuu, mutta tiukasti",
+          "actual": "answer · Mahtuu, mutta tiukasti",
+          "falseSafe": false,
+          "pass": true,
+          "overAbstained": false,
+          "latencyMs": 1.2
+        }
+      ],
+      "receiptsChecked": 1,
+      "receiptsValid": 1
+    }
+  ]
+}

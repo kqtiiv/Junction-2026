@@ -11,5 +11,5 @@
     "verbatimModuleSyntax": true,
     "types": ["node"]
   },
-  "include": ["src/**/*.ts", "test/**/*.ts", "../contracts/generated/ts/contracts.ts", "../contracts/interfaces/adapter.ts"]
+  "include": ["src/**/*.ts", "test/**/*.ts", "eval/**/*.ts", "../contracts/generated/ts/contracts.ts", "../contracts/interfaces/adapter.ts"]
 }
