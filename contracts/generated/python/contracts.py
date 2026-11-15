@@ -314,6 +314,205 @@ class CardValue:
 
 
 @dataclass
+class ReceiptReason:
+    blocks_verdict: bool
+    code: str
+    text: Dict[str, str]
+
+    @staticmethod
+    def from_dict(obj: Any) -> 'ReceiptReason':
+        assert isinstance(obj, dict)
+        blocks_verdict = from_bool(obj.get("blocks_verdict"))
+        code = from_str(obj.get("code"))
+        text = from_dict(from_str, obj.get("text"))
+        return ReceiptReason(blocks_verdict, code, text)
+
+    def to_dict(self) -> dict:
+        result: dict = {}
+        result["blocks_verdict"] = from_bool(self.blocks_verdict)
+        result["code"] = from_str(self.code)
+        result["text"] = from_dict(from_str, self.text)
+        return result
+
+
+class State(Enum):
+    """confident: answered without reservations. caveated: answered, with reasons shown.
+    abstained: no verdict was given, because the data could not support one.
+    """
+    ABSTAINED = "abstained"
+    CAVEATED = "caveated"
+    CONFIDENT = "confident"
+
+
+@dataclass
+class ReceiptConfidence:
+    reasons: List[ReceiptReason]
+    state: State
+    """confident: answered without reservations. caveated: answered, with reasons shown.
+    abstained: no verdict was given, because the data could not support one.
+    """
+
+    @staticmethod
+    def from_dict(obj: Any) -> 'ReceiptConfidence':
+        assert isinstance(obj, dict)
+        reasons = from_list(ReceiptReason.from_dict, obj.get("reasons"))
+        state = State(obj.get("state"))
+        return ReceiptConfidence(reasons, state)
+
+    def to_dict(self) -> dict:
+        result: dict = {}
+        result["reasons"] = from_list(lambda x: to_class(ReceiptReason, x), self.reasons)
+        result["state"] = to_enum(State, self.state)
+        return result
+
+
+@dataclass
+class ReceiptFreshness:
+    as_of: datetime
+    simulated: bool
+    """True for synthetic or fixture data, and for a simulated date."""
+
+    source: str
+
+    @staticmethod
+    def from_dict(obj: Any) -> 'ReceiptFreshness':
+        assert isinstance(obj, dict)
+        as_of = from_datetime(obj.get("as_of"))
+        simulated = from_bool(obj.get("simulated"))
+        source = from_str(obj.get("source"))
+        return ReceiptFreshness(as_of, simulated, source)
+
+    def to_dict(self) -> dict:
+        result: dict = {}
+        result["as_of"] = self.as_of.isoformat()
+        result["simulated"] = from_bool(self.simulated)
+        result["source"] = from_str(self.source)
+        return result
+
+
+class LineSource(Enum):
+    CAMERA = "camera"
+    COACH = "coach"
+    ENGINE = "engine"
+    FIXTURE = "fixture"
+    PLATFORM = "platform"
+    USER = "user"
+
+
+@dataclass
+class ReceiptLine:
+    epistemic: Epistemic
+    key: str
+    label: Dict[str, str]
+    source: LineSource
+    money: Optional[Money] = None
+    note: Optional[Dict[str, str]] = None
+    ref: Optional[str] = None
+    text: Optional[str] = None
+
+    @staticmethod
+    def from_dict(obj: Any) -> 'ReceiptLine':
+        assert isinstance(obj, dict)
+        epistemic = Epistemic(obj.get("epistemic"))
+        key = from_str(obj.get("key"))
+        label = from_dict(from_str, obj.get("label"))
+        source = LineSource(obj.get("source"))
+        money = from_union([Money.from_dict, from_none], obj.get("money"))
+        note = from_union([lambda x: from_dict(from_str, x), from_none], obj.get("note"))
+        ref = from_union([from_str, from_none], obj.get("ref"))
+        text = from_union([from_str, from_none], obj.get("text"))
+        return ReceiptLine(epistemic, key, label, source, money, note, ref, text)
+
+    def to_dict(self) -> dict:
+        result: dict = {}
+        result["epistemic"] = to_enum(Epistemic, self.epistemic)
+        result["key"] = from_str(self.key)
+        result["label"] = from_dict(from_str, self.label)
+        result["source"] = to_enum(LineSource, self.source)
+        if self.money is not None:
+            result["money"] = from_union([lambda x: to_class(Money, x), from_none], self.money)
+        if self.note is not None:
+            result["note"] = from_union([lambda x: from_dict(from_str, x), from_none], self.note)
+        if self.ref is not None:
+            result["ref"] = from_union([from_str, from_none], self.ref)
+        if self.text is not None:
+            result["text"] = from_union([from_str, from_none], self.text)
+        return result
+
+
+class VerificationStatus(Enum):
+    FAILED = "failed"
+    VERIFIED = "verified"
+
+
+@dataclass
+class ReceiptVerification:
+    calc_ids: List[str]
+    checked_values: int
+    digest: str
+    key_id: str
+    signature: str
+    """Compact JWS (ES256) by the platform over {card_id, digest, calc_ids, status, signed_at}."""
+
+    signed_at: datetime
+    status: VerificationStatus
+
+    @staticmethod
+    def from_dict(obj: Any) -> 'ReceiptVerification':
+        assert isinstance(obj, dict)
+        calc_ids = from_list(from_str, obj.get("calc_ids"))
+        checked_values = from_int(obj.get("checked_values"))
+        digest = from_str(obj.get("digest"))
+        key_id = from_str(obj.get("key_id"))
+        signature = from_str(obj.get("signature"))
+        signed_at = from_datetime(obj.get("signed_at"))
+        status = VerificationStatus(obj.get("status"))
+        return ReceiptVerification(calc_ids, checked_values, digest, key_id, signature, signed_at, status)
+
+    def to_dict(self) -> dict:
+        result: dict = {}
+        result["calc_ids"] = from_list(from_str, self.calc_ids)
+        result["checked_values"] = from_int(self.checked_values)
+        result["digest"] = from_str(self.digest)
+        result["key_id"] = from_str(self.key_id)
+        result["signature"] = from_str(self.signature)
+        result["signed_at"] = self.signed_at.isoformat()
+        result["status"] = to_enum(VerificationStatus, self.status)
+        return result
+
+
+@dataclass
+class Receipt:
+    """The evidence behind a card (DEC-029): every input and result as a line with its source,
+    how sure the answer is and why, how fresh the data is, and the platform's verification.
+    The capability writes lines, confidence and freshness; only the platform writes
+    verification, after the grounding verifier has passed.
+    """
+    confidence: ReceiptConfidence
+    freshness: ReceiptFreshness
+    lines: List[ReceiptLine]
+    verification: Optional[ReceiptVerification] = None
+
+    @staticmethod
+    def from_dict(obj: Any) -> 'Receipt':
+        assert isinstance(obj, dict)
+        confidence = ReceiptConfidence.from_dict(obj.get("confidence"))
+        freshness = ReceiptFreshness.from_dict(obj.get("freshness"))
+        lines = from_list(ReceiptLine.from_dict, obj.get("lines"))
+        verification = from_union([ReceiptVerification.from_dict, from_none], obj.get("verification"))
+        return Receipt(confidence, freshness, lines, verification)
+
+    def to_dict(self) -> dict:
+        result: dict = {}
+        result["confidence"] = to_class(ReceiptConfidence, self.confidence)
+        result["freshness"] = to_class(ReceiptFreshness, self.freshness)
+        result["lines"] = from_list(lambda x: to_class(ReceiptLine, x), self.lines)
+        if self.verification is not None:
+            result["verification"] = from_union([lambda x: to_class(ReceiptVerification, x), from_none], self.verification)
+        return result
+
+
+@dataclass
 class RenderHints:
     glasses_display_lines: Optional[List[str]] = None
     sensitive: Optional[bool] = None
@@ -396,6 +595,7 @@ class InsightCard:
     data_mode: Optional[str] = None
     primary: Optional[CardValue] = None
     proposal_ids: Optional[List[str]] = None
+    receipt: Optional[Receipt] = None
     render_hints: Optional[RenderHints] = None
     rows: Optional[List[CardRow]] = None
 
@@ -415,9 +615,10 @@ class InsightCard:
         data_mode = from_union([from_str, from_none], obj.get("data_mode"))
         primary = from_union([CardValue.from_dict, from_none], obj.get("primary"))
         proposal_ids = from_union([lambda x: from_list(from_str, x), from_none], obj.get("proposal_ids"))
+        receipt = from_union([Receipt.from_dict, from_none], obj.get("receipt"))
         render_hints = from_union([RenderHints.from_dict, from_none], obj.get("render_hints"))
         rows = from_union([lambda x: from_list(CardRow.from_dict, x), from_none], obj.get("rows"))
-        return InsightCard(assumptions, basis, capability_id, card_id, epistemic, missing_data, schema, title, type, body, data_mode, primary, proposal_ids, render_hints, rows)
+        return InsightCard(assumptions, basis, capability_id, card_id, epistemic, missing_data, schema, title, type, body, data_mode, primary, proposal_ids, receipt, render_hints, rows)
 
     def to_dict(self) -> dict:
         result: dict = {}
@@ -438,6 +639,8 @@ class InsightCard:
             result["primary"] = from_union([lambda x: to_class(CardValue, x), from_none], self.primary)
         if self.proposal_ids is not None:
             result["proposal_ids"] = from_union([lambda x: from_list(from_str, x), from_none], self.proposal_ids)
+        if self.receipt is not None:
+            result["receipt"] = from_union([lambda x: to_class(Receipt, x), from_none], self.receipt)
         if self.render_hints is not None:
             result["render_hints"] = from_union([lambda x: to_class(RenderHints, x), from_none], self.render_hints)
         if self.rows is not None:
@@ -679,7 +882,7 @@ class ContextCaptureSchema(Enum):
     PLATFORM_CONTEXT_CAPTURE_V1 = "platform.context_capture/v1"
 
 
-class Source(Enum):
+class ContextCaptureSource(Enum):
     GLASSES_PHOTO = "glasses_photo"
     GLASSES_STREAM_FRAME = "glasses_stream_frame"
     PHONE_CAMERA = "phone_camera"
@@ -713,7 +916,7 @@ class ContextCapture:
     """
     schema: ContextCaptureSchema
     session_id: str
-    source: Source
+    source: ContextCaptureSource
     trigger: Trigger
     user_ref: str
 
@@ -729,7 +932,7 @@ class ContextCapture:
         purpose = from_str(obj.get("purpose"))
         schema = ContextCaptureSchema(obj.get("schema"))
         session_id = from_str(obj.get("session_id"))
-        source = Source(obj.get("source"))
+        source = ContextCaptureSource(obj.get("source"))
         trigger = Trigger(obj.get("trigger"))
         user_ref = from_str(obj.get("user_ref"))
         return ContextCapture(capture_id, captured_at, consent_grant_id, locale, media, minimisation, purpose, schema, session_id, source, trigger, user_ref)
@@ -745,7 +948,7 @@ class ContextCapture:
         result["purpose"] = from_str(self.purpose)
         result["schema"] = to_enum(ContextCaptureSchema, self.schema)
         result["session_id"] = from_str(self.session_id)
-        result["source"] = to_enum(Source, self.source)
+        result["source"] = to_enum(ContextCaptureSource, self.source)
         result["trigger"] = to_enum(Trigger, self.trigger)
         result["user_ref"] = from_str(self.user_ref)
         return result
@@ -2014,6 +2217,7 @@ class FinanceToolName(Enum):
     FINANCE_PROCESS_RECEIPT = "finance.process_receipt"
     FINANCE_PROPOSE_CLASSIFICATION_CHANGE = "finance.propose_classification_change"
     FINANCE_SIMULATE_SPENDING_CHANGE = "finance.simulate_spending_change"
+    FINANCE_SUMMARIZE_DECISIONS = "finance.summarize_decisions"
 
 
 class GlassesInputKind(Enum):
@@ -2208,11 +2412,13 @@ class MissingData:
 class MissingDataCode(Enum):
     BALANCE_STALE = "BALANCE_STALE"
     COMMITMENT_ESTIMATED = "COMMITMENT_ESTIMATED"
+    COMMITMENT_UNKNOWN = "COMMITMENT_UNKNOWN"
     HISTORY_LT_4__WEEKS = "HISTORY_LT_4_WEEKS"
     INCOME_NOT_DETECTED = "INCOME_NOT_DETECTED"
     NO_BALANCE = "NO_BALANCE"
     PRICE_UNCERTAIN = "PRICE_UNCERTAIN"
     RECEIPT_UNMATCHED = "RECEIPT_UNMATCHED"
+    SOURCE_CONFLICT = "SOURCE_CONFLICT"
 
 
 @dataclass

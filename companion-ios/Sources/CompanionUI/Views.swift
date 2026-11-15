@@ -468,6 +468,7 @@ public struct CompanionScreen: View {
                     .overlay(Circle().strokeBorder(Look.line, lineWidth: 1))
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
+                    .accessibilityIdentifier("menu")
             }
             .accessibilityLabel("More")
             .accessibilityIdentifier("menu")

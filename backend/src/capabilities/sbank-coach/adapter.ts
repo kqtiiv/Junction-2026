@@ -5,10 +5,11 @@
 import type { AgentOrchestratorAdapter, AdapterHealth } from "../../../../contracts/interfaces/adapter.ts";
 import {
   loadExample, validate, assertValid,
-  type ActionResult, type DomainCapability, type DomainRequest, type DomainResponse, type DomainResponseEvent, type UserConfirmation,
+  type ActionResult, type DomainCapability, type DomainRequest, type DomainResponse, type DomainResponseEvent, type InsightCard,
+  type ToolResult, type UserConfirmation,
 } from "../../contracts.ts";
 import { PlatformError } from "../../errors.ts";
-import { verifyResponse } from "../../sdk/verifier.ts";
+import { cardFigures, verifyResponse, type UserScopedCalculationResolver } from "../../sdk/verifier.ts";
 import type { AgentBackend } from "./backend.ts";
 import { CAPABILITY_ID, type DeterministicFastPath } from "./fast-path.ts";
 import type { FinanceEngine } from "./finance-engine.ts";
@@ -31,7 +32,14 @@ export class SBankCoachAdapter implements AgentOrchestratorAdapter {
   private readonly manifestDoc: DomainCapability;
   private readonly owners = new Map<string, AgentBackend>();
 
+  /** The engine's calculation log, then the coach's own derived calculations (decision sums). */
+  private readonly resolver: UserScopedCalculationResolver;
+
   constructor(private readonly opts: SBankCoachAdapterOptions) {
+    this.resolver = {
+      resolve: async (userRef: string, calcId: string): Promise<ToolResult | null> =>
+        (await opts.engine.resolve(userRef, calcId)) ?? (await opts.fastPath.coachCalcs.resolve(userRef, calcId)),
+    };
     const doc = loadExample<DomainCapability>("valid/finance/manifest.sbank_coach.json");
     this.manifestDoc = { ...doc, transport: { kind: "in_process" } };
     assertValid("finance/finance_manifest", this.manifestDoc);
@@ -76,7 +84,8 @@ export class SBankCoachAdapter implements AgentOrchestratorAdapter {
     }
     if (signal.aborted) return;
 
-    const outcome = await verifyResponse(response, req.user_ref, req.observations, engine);
+    void engine;
+    const outcome = await verifyResponse(response, req.user_ref, req.observations, this.resolver);
     const verified = outcome.speechVerified && outcome.droppedCards.length === 0;
     const isFi = req.locale.startsWith("fi");
     const final: DebuggableResponse = {
@@ -114,7 +123,24 @@ export class SBankCoachAdapter implements AgentOrchestratorAdapter {
     }
     // Proposals are single use: whatever the outcome, this one is finished.
     this.owners.delete(c.proposal_id);
-    return backend.confirm(c);
+    const result = await backend.confirm(c);
+    // The updated card goes through the same grounding check as any answer.
+    if (result.card && !(await this.verifyCard(result.card, c.user_ref)).grounded) {
+      const { card: _dropped, ...rest } = result;
+      return rest;
+    }
+    return result;
+  }
+
+  /** DEC-029: every figure on the card must still match this user's calculation log. */
+  async verifyCard(card: InsightCard, userRef: string): Promise<{ grounded: boolean; checked_values: number; unverified: string[] }> {
+    const probe: DomainResponse = {
+      schema: "platform.domain_response/v1", request_id: "req_verify", status: "answered",
+      speech: { text: "", epistemic: "fact" }, cards: [card], proposals: [],
+      trace: { calc_ids: card.basis.calc_ids, tools: [], backend: "verify", verified: false },
+    };
+    const outcome = await verifyResponse(probe, userRef, [], this.resolver);
+    return { grounded: outcome.droppedCards.length === 0, checked_values: cardFigures(card).length, unverified: outcome.unverified };
   }
 
   private async callWithDeadline(backend: AgentBackend, req: DomainRequest, signal: AbortSignal): Promise<DomainResponse> {

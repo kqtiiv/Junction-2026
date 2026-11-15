@@ -17,7 +17,9 @@ final class CompanionUITests: XCTestCase {
         screenshot(app, "1-consent")
         allow.tap()
 
-        app.buttons["menu"].tap()
+        let menu = app.buttons["menu"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 20), "main screen with the menu")
+        menu.tap()
         app.buttons["connectGlasses"].tap()
         XCTAssertTrue(element(app, containing: "mode: glasses").waitForExistence(timeout: 45), "simulated glasses connected")
         XCTAssertTrue(element(app, containing: "glasses: mock").exists, "the mock is never hidden")

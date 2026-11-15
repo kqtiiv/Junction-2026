@@ -18,6 +18,7 @@ import type {
   DomainCapability,
   DomainRequest,
   DomainResponseEvent,
+  InsightCard,
   ToolResult,
   UserConfirmation,
 } from "../generated/ts/contracts";
@@ -48,6 +49,12 @@ export interface AgentOrchestratorAdapter {
   onConfirmation(c: UserConfirmation): Promise<ActionResult>;
 
   health(): Promise<AdapterHealth>;
+
+  /**
+   * Optional (DEC-029): re-check a card a client sends back against this user's calculation
+   * log, so a receipt can be verified independently of the session that produced it.
+   */
+  verifyCard?(card: InsightCard, userRef: string): Promise<{ grounded: boolean; checked_values: number; unverified: string[] }>;
 }
 
 /**

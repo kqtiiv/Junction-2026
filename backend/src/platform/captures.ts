@@ -18,6 +18,14 @@ export class CaptureStore {
   /** capture_id → grant id, kept after a revoke-purge so later use reports CONSENT_REVOKED. */
   private readonly purged = new Map<string, string>();
 
+  /** Observations this user's captures produced, by observation_id (receipt re-verification, DEC-029). */
+  observations(userRef: string, observationIds: string[]): Observation[] {
+    const want = new Set(observationIds);
+    return [...this.items.values()]
+      .filter((c) => c.userRef === userRef && c.observation && want.has(c.observation.observation_id))
+      .map((c) => c.observation!);
+  }
+
   put(capture: ContextCapture, userRef: string, image: Buffer): void {
     this.items.set(capture.capture_id, { capture, userRef, image, expiresAt: Date.now() + CAPTURE_TTL_MS });
   }

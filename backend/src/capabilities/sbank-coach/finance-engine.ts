@@ -49,7 +49,8 @@ export function affordabilityResult(sts: ToolResult, input: AffordabilityInput, 
   const stsWeek = (sts.result as StsResult).safe_to_spend_week.amount;
   const allowance = toCents(stsWeek);
   const remaining = allowance - toCents(input.amount);
-  const verdict = remaining < 0n ? "EXCEEDS" : remaining * 4n >= allowance ? "FITS" : "TIGHT";
+  // Pace mode (spending history only) never gets a yes/no (REFERENCE_DESIGN §6.6).
+  const verdict = sts.data_mode === "pace" ? "UNKNOWN" : remaining < 0n ? "EXCEEDS" : remaining * 4n >= allowance ? "FITS" : "TIGHT";
   const assumptions = [...sts.assumptions];
   if (input.priceSource === "observation") assumptions.unshift("Price read from the shelf label");
   if (input.priceSource === "stated_amount") assumptions.unshift("Amount as stated by the user");

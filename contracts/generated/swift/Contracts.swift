@@ -618,6 +618,7 @@ public struct InsightCard: Codable {
     public let missingData: [[String: String]]
     public let primary: CardValue?
     public let proposalIDS: [String]?
+    public let receipt: Receipt?
     public let renderHints: RenderHints?
     public let rows: [CardRow]?
     public let schema: InsightCardSchema
@@ -633,11 +634,12 @@ public struct InsightCard: Codable {
         case missingData = "missing_data"
         case primary
         case proposalIDS = "proposal_ids"
+        case receipt
         case renderHints = "render_hints"
         case rows, schema, title, type
     }
 
-    public init(assumptions: [[String: String]], basis: CardBasis, body: [String: String]?, capabilityID: String, cardID: String, dataMode: String?, epistemic: Epistemic, missingData: [[String: String]], primary: CardValue?, proposalIDS: [String]?, renderHints: RenderHints?, rows: [CardRow]?, schema: InsightCardSchema, title: [String: String], type: InsightCardType) {
+    public init(assumptions: [[String: String]], basis: CardBasis, body: [String: String]?, capabilityID: String, cardID: String, dataMode: String?, epistemic: Epistemic, missingData: [[String: String]], primary: CardValue?, proposalIDS: [String]?, receipt: Receipt?, renderHints: RenderHints?, rows: [CardRow]?, schema: InsightCardSchema, title: [String: String], type: InsightCardType) {
         self.assumptions = assumptions
         self.basis = basis
         self.body = body
@@ -648,6 +650,7 @@ public struct InsightCard: Codable {
         self.missingData = missingData
         self.primary = primary
         self.proposalIDS = proposalIDS
+        self.receipt = receipt
         self.renderHints = renderHints
         self.rows = rows
         self.schema = schema
@@ -685,6 +688,7 @@ public extension InsightCard {
         missingData: [[String: String]]? = nil,
         primary: CardValue?? = nil,
         proposalIDS: [String]?? = nil,
+        receipt: Receipt?? = nil,
         renderHints: RenderHints?? = nil,
         rows: [CardRow]?? = nil,
         schema: InsightCardSchema? = nil,
@@ -702,6 +706,7 @@ public extension InsightCard {
             missingData: missingData ?? self.missingData,
             primary: primary ?? self.primary,
             proposalIDS: proposalIDS ?? self.proposalIDS,
+            receipt: receipt ?? self.receipt,
             renderHints: renderHints ?? self.renderHints,
             rows: rows ?? self.rows,
             schema: schema ?? self.schema,
@@ -990,6 +995,404 @@ public extension Money {
 
 public enum Currency: String, Codable {
     case eur = "EUR"
+}
+
+/// The evidence behind a card (DEC-029): every input and result as a line with its source,
+/// how sure the answer is and why, how fresh the data is, and the platform's verification.
+/// The capability writes lines, confidence and freshness; only the platform writes
+/// verification, after the grounding verifier has passed.
+// MARK: - Receipt
+public struct Receipt: Codable {
+    public let confidence: ReceiptConfidence
+    public let freshness: ReceiptFreshness
+    public let lines: [ReceiptLine]
+    public let verification: ReceiptVerification?
+
+    public init(confidence: ReceiptConfidence, freshness: ReceiptFreshness, lines: [ReceiptLine], verification: ReceiptVerification?) {
+        self.confidence = confidence
+        self.freshness = freshness
+        self.lines = lines
+        self.verification = verification
+    }
+}
+
+// MARK: Receipt convenience initializers and mutators
+
+public extension Receipt {
+    init(data: Data) throws {
+        self = try newJSONDecoder().decode(Receipt.self, from: data)
+    }
+
+    init(_ json: String, using encoding: String.Encoding = .utf8) throws {
+        guard let data = json.data(using: encoding) else {
+            throw NSError(domain: "JSONDecoding", code: 0, userInfo: nil)
+        }
+        try self.init(data: data)
+    }
+
+    init(fromURL url: URL) throws {
+        try self.init(data: try Data(contentsOf: url))
+    }
+
+    func with(
+        confidence: ReceiptConfidence? = nil,
+        freshness: ReceiptFreshness? = nil,
+        lines: [ReceiptLine]? = nil,
+        verification: ReceiptVerification?? = nil
+    ) -> Receipt {
+        return Receipt(
+            confidence: confidence ?? self.confidence,
+            freshness: freshness ?? self.freshness,
+            lines: lines ?? self.lines,
+            verification: verification ?? self.verification
+        )
+    }
+
+    func jsonData() throws -> Data {
+        return try newJSONEncoder().encode(self)
+    }
+
+    func jsonString(encoding: String.Encoding = .utf8) throws -> String? {
+        return String(data: try self.jsonData(), encoding: encoding)
+    }
+}
+
+// MARK: - ReceiptConfidence
+public struct ReceiptConfidence: Codable {
+    public let reasons: [ReceiptReason]
+    /// confident: answered without reservations. caveated: answered, with reasons shown.
+    /// abstained: no verdict was given, because the data could not support one.
+    public let state: State
+
+    public init(reasons: [ReceiptReason], state: State) {
+        self.reasons = reasons
+        self.state = state
+    }
+}
+
+// MARK: ReceiptConfidence convenience initializers and mutators
+
+public extension ReceiptConfidence {
+    init(data: Data) throws {
+        self = try newJSONDecoder().decode(ReceiptConfidence.self, from: data)
+    }
+
+    init(_ json: String, using encoding: String.Encoding = .utf8) throws {
+        guard let data = json.data(using: encoding) else {
+            throw NSError(domain: "JSONDecoding", code: 0, userInfo: nil)
+        }
+        try self.init(data: data)
+    }
+
+    init(fromURL url: URL) throws {
+        try self.init(data: try Data(contentsOf: url))
+    }
+
+    func with(
+        reasons: [ReceiptReason]? = nil,
+        state: State? = nil
+    ) -> ReceiptConfidence {
+        return ReceiptConfidence(
+            reasons: reasons ?? self.reasons,
+            state: state ?? self.state
+        )
+    }
+
+    func jsonData() throws -> Data {
+        return try newJSONEncoder().encode(self)
+    }
+
+    func jsonString(encoding: String.Encoding = .utf8) throws -> String? {
+        return String(data: try self.jsonData(), encoding: encoding)
+    }
+}
+
+// MARK: - ReceiptReason
+public struct ReceiptReason: Codable {
+    public let blocksVerdict: Bool
+    public let code: String
+    public let text: [String: String]
+
+    public enum CodingKeys: String, CodingKey {
+        case blocksVerdict = "blocks_verdict"
+        case code, text
+    }
+
+    public init(blocksVerdict: Bool, code: String, text: [String: String]) {
+        self.blocksVerdict = blocksVerdict
+        self.code = code
+        self.text = text
+    }
+}
+
+// MARK: ReceiptReason convenience initializers and mutators
+
+public extension ReceiptReason {
+    init(data: Data) throws {
+        self = try newJSONDecoder().decode(ReceiptReason.self, from: data)
+    }
+
+    init(_ json: String, using encoding: String.Encoding = .utf8) throws {
+        guard let data = json.data(using: encoding) else {
+            throw NSError(domain: "JSONDecoding", code: 0, userInfo: nil)
+        }
+        try self.init(data: data)
+    }
+
+    init(fromURL url: URL) throws {
+        try self.init(data: try Data(contentsOf: url))
+    }
+
+    func with(
+        blocksVerdict: Bool? = nil,
+        code: String? = nil,
+        text: [String: String]? = nil
+    ) -> ReceiptReason {
+        return ReceiptReason(
+            blocksVerdict: blocksVerdict ?? self.blocksVerdict,
+            code: code ?? self.code,
+            text: text ?? self.text
+        )
+    }
+
+    func jsonData() throws -> Data {
+        return try newJSONEncoder().encode(self)
+    }
+
+    func jsonString(encoding: String.Encoding = .utf8) throws -> String? {
+        return String(data: try self.jsonData(), encoding: encoding)
+    }
+}
+
+/// confident: answered without reservations. caveated: answered, with reasons shown.
+/// abstained: no verdict was given, because the data could not support one.
+public enum State: String, Codable {
+    case abstained = "abstained"
+    case caveated = "caveated"
+    case confident = "confident"
+}
+
+// MARK: - ReceiptFreshness
+public struct ReceiptFreshness: Codable {
+    public let asOf: Date
+    /// True for synthetic or fixture data, and for a simulated date.
+    public let simulated: Bool
+    public let source: String
+
+    public enum CodingKeys: String, CodingKey {
+        case asOf = "as_of"
+        case simulated, source
+    }
+
+    public init(asOf: Date, simulated: Bool, source: String) {
+        self.asOf = asOf
+        self.simulated = simulated
+        self.source = source
+    }
+}
+
+// MARK: ReceiptFreshness convenience initializers and mutators
+
+public extension ReceiptFreshness {
+    init(data: Data) throws {
+        self = try newJSONDecoder().decode(ReceiptFreshness.self, from: data)
+    }
+
+    init(_ json: String, using encoding: String.Encoding = .utf8) throws {
+        guard let data = json.data(using: encoding) else {
+            throw NSError(domain: "JSONDecoding", code: 0, userInfo: nil)
+        }
+        try self.init(data: data)
+    }
+
+    init(fromURL url: URL) throws {
+        try self.init(data: try Data(contentsOf: url))
+    }
+
+    func with(
+        asOf: Date? = nil,
+        simulated: Bool? = nil,
+        source: String? = nil
+    ) -> ReceiptFreshness {
+        return ReceiptFreshness(
+            asOf: asOf ?? self.asOf,
+            simulated: simulated ?? self.simulated,
+            source: source ?? self.source
+        )
+    }
+
+    func jsonData() throws -> Data {
+        return try newJSONEncoder().encode(self)
+    }
+
+    func jsonString(encoding: String.Encoding = .utf8) throws -> String? {
+        return String(data: try self.jsonData(), encoding: encoding)
+    }
+}
+
+// MARK: - ReceiptLine
+public struct ReceiptLine: Codable {
+    public let epistemic: Epistemic
+    public let key: String
+    public let label: [String: String]
+    public let money: Money?
+    public let note: [String: String]?
+    public let ref: String?
+    public let source: LineSource
+    public let text: String?
+
+    public init(epistemic: Epistemic, key: String, label: [String: String], money: Money?, note: [String: String]?, ref: String?, source: LineSource, text: String?) {
+        self.epistemic = epistemic
+        self.key = key
+        self.label = label
+        self.money = money
+        self.note = note
+        self.ref = ref
+        self.source = source
+        self.text = text
+    }
+}
+
+// MARK: ReceiptLine convenience initializers and mutators
+
+public extension ReceiptLine {
+    init(data: Data) throws {
+        self = try newJSONDecoder().decode(ReceiptLine.self, from: data)
+    }
+
+    init(_ json: String, using encoding: String.Encoding = .utf8) throws {
+        guard let data = json.data(using: encoding) else {
+            throw NSError(domain: "JSONDecoding", code: 0, userInfo: nil)
+        }
+        try self.init(data: data)
+    }
+
+    init(fromURL url: URL) throws {
+        try self.init(data: try Data(contentsOf: url))
+    }
+
+    func with(
+        epistemic: Epistemic? = nil,
+        key: String? = nil,
+        label: [String: String]? = nil,
+        money: Money?? = nil,
+        note: [String: String]?? = nil,
+        ref: String?? = nil,
+        source: LineSource? = nil,
+        text: String?? = nil
+    ) -> ReceiptLine {
+        return ReceiptLine(
+            epistemic: epistemic ?? self.epistemic,
+            key: key ?? self.key,
+            label: label ?? self.label,
+            money: money ?? self.money,
+            note: note ?? self.note,
+            ref: ref ?? self.ref,
+            source: source ?? self.source,
+            text: text ?? self.text
+        )
+    }
+
+    func jsonData() throws -> Data {
+        return try newJSONEncoder().encode(self)
+    }
+
+    func jsonString(encoding: String.Encoding = .utf8) throws -> String? {
+        return String(data: try self.jsonData(), encoding: encoding)
+    }
+}
+
+public enum LineSource: String, Codable {
+    case camera = "camera"
+    case coach = "coach"
+    case engine = "engine"
+    case fixture = "fixture"
+    case platform = "platform"
+    case user = "user"
+}
+
+// MARK: - ReceiptVerification
+public struct ReceiptVerification: Codable {
+    public let calcIDS: [String]
+    public let checkedValues: Int
+    public let digest: String
+    public let keyID: String
+    /// Compact JWS (ES256) by the platform over {card_id, digest, calc_ids, status, signed_at}.
+    public let signature: String
+    public let signedAt: Date
+    public let status: VerificationStatus
+
+    public enum CodingKeys: String, CodingKey {
+        case calcIDS = "calc_ids"
+        case checkedValues = "checked_values"
+        case digest
+        case keyID = "key_id"
+        case signature
+        case signedAt = "signed_at"
+        case status
+    }
+
+    public init(calcIDS: [String], checkedValues: Int, digest: String, keyID: String, signature: String, signedAt: Date, status: VerificationStatus) {
+        self.calcIDS = calcIDS
+        self.checkedValues = checkedValues
+        self.digest = digest
+        self.keyID = keyID
+        self.signature = signature
+        self.signedAt = signedAt
+        self.status = status
+    }
+}
+
+// MARK: ReceiptVerification convenience initializers and mutators
+
+public extension ReceiptVerification {
+    init(data: Data) throws {
+        self = try newJSONDecoder().decode(ReceiptVerification.self, from: data)
+    }
+
+    init(_ json: String, using encoding: String.Encoding = .utf8) throws {
+        guard let data = json.data(using: encoding) else {
+            throw NSError(domain: "JSONDecoding", code: 0, userInfo: nil)
+        }
+        try self.init(data: data)
+    }
+
+    init(fromURL url: URL) throws {
+        try self.init(data: try Data(contentsOf: url))
+    }
+
+    func with(
+        calcIDS: [String]? = nil,
+        checkedValues: Int? = nil,
+        digest: String? = nil,
+        keyID: String? = nil,
+        signature: String? = nil,
+        signedAt: Date? = nil,
+        status: VerificationStatus? = nil
+    ) -> ReceiptVerification {
+        return ReceiptVerification(
+            calcIDS: calcIDS ?? self.calcIDS,
+            checkedValues: checkedValues ?? self.checkedValues,
+            digest: digest ?? self.digest,
+            keyID: keyID ?? self.keyID,
+            signature: signature ?? self.signature,
+            signedAt: signedAt ?? self.signedAt,
+            status: status ?? self.status
+        )
+    }
+
+    func jsonData() throws -> Data {
+        return try newJSONEncoder().encode(self)
+    }
+
+    func jsonString(encoding: String.Encoding = .utf8) throws -> String? {
+        return String(data: try self.jsonData(), encoding: encoding)
+    }
+}
+
+public enum VerificationStatus: String, Codable {
+    case failed = "failed"
+    case verified = "verified"
 }
 
 // MARK: - RenderHints
@@ -1341,7 +1744,7 @@ public struct ContextCapture: Codable {
     public let purpose: String
     public let schema: ContextCaptureSchema
     public let sessionID: String
-    public let source: Source
+    public let source: ContextCaptureSource
     public let trigger: Trigger
     public let userRef: String
 
@@ -1355,7 +1758,7 @@ public struct ContextCapture: Codable {
         case userRef = "user_ref"
     }
 
-    public init(captureID: String, capturedAt: Date, consentGrantID: String, locale: String, media: CaptureMedia, minimisation: [Minimisation], purpose: String, schema: ContextCaptureSchema, sessionID: String, source: Source, trigger: Trigger, userRef: String) {
+    public init(captureID: String, capturedAt: Date, consentGrantID: String, locale: String, media: CaptureMedia, minimisation: [Minimisation], purpose: String, schema: ContextCaptureSchema, sessionID: String, source: ContextCaptureSource, trigger: Trigger, userRef: String) {
         self.captureID = captureID
         self.capturedAt = capturedAt
         self.consentGrantID = consentGrantID
@@ -1399,7 +1802,7 @@ public extension ContextCapture {
         purpose: String? = nil,
         schema: ContextCaptureSchema? = nil,
         sessionID: String? = nil,
-        source: Source? = nil,
+        source: ContextCaptureSource? = nil,
         trigger: Trigger? = nil,
         userRef: String? = nil
     ) -> ContextCapture {
@@ -1523,7 +1926,7 @@ public enum ContextCaptureSchema: String, Codable {
     case platformContextCaptureV1 = "platform.context_capture/v1"
 }
 
-public enum Source: String, Codable {
+public enum ContextCaptureSource: String, Codable {
     case glassesPhoto = "glasses_photo"
     case glassesStreamFrame = "glasses_stream_frame"
     case phoneCamera = "phone_camera"
@@ -3770,6 +4173,7 @@ public enum FinanceToolName: String, Codable {
     case financeProcessReceipt = "finance.process_receipt"
     case financeProposeClassificationChange = "finance.propose_classification_change"
     case financeSimulateSpendingChange = "finance.simulate_spending_change"
+    case financeSummarizeDecisions = "finance.summarize_decisions"
 }
 
 /// Normalised glasses input. The companion maps device-specific events (touchpad, capture
@@ -4137,11 +4541,13 @@ public extension MissingData {
 public enum MissingDataCode: String, Codable {
     case balanceStale = "BALANCE_STALE"
     case commitmentEstimated = "COMMITMENT_ESTIMATED"
+    case commitmentUnknown = "COMMITMENT_UNKNOWN"
     case historyLt4_Weeks = "HISTORY_LT_4_WEEKS"
     case incomeNotDetected = "INCOME_NOT_DETECTED"
     case noBalance = "NO_BALANCE"
     case priceUncertain = "PRICE_UNCERTAIN"
     case receiptUnmatched = "RECEIPT_UNMATCHED"
+    case sourceConflict = "SOURCE_CONFLICT"
 }
 
 /// Registry entry for a model the platform uses (ASR, TTS, router, OCR, embeddings, LLM),

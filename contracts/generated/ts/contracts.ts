@@ -77,7 +77,9 @@ export type MissingDataCode =
   | "HISTORY_LT_4_WEEKS"
   | "COMMITMENT_ESTIMATED"
   | "RECEIPT_UNMATCHED"
-  | "PRICE_UNCERTAIN";
+  | "PRICE_UNCERTAIN"
+  | "COMMITMENT_UNKNOWN"
+  | "SOURCE_CONFLICT";
 export type FinanceIntent =
   | "finance.spend.query"
   | "finance.spender_profile"
@@ -109,7 +111,8 @@ export type FinanceToolName =
   | "finance.calculate_affordability"
   | "finance.process_receipt"
   | "finance.propose_classification_change"
-  | "finance.get_calculation";
+  | "finance.get_calculation"
+  | "finance.summarize_decisions";
 
 export interface ContractsIndex {
   ActionProposal?: ActionProposal;
@@ -235,6 +238,7 @@ export interface InsightCard {
   assumptions: LText[];
   missing_data: LText[];
   proposal_ids?: Ref[];
+  receipt?: Receipt;
   render_hints?: RenderHints;
 }
 export interface CardValue {
@@ -262,6 +266,64 @@ export interface CardSource {
   kind: "calculation" | "observation" | "document";
   ref: Ref;
   title?: string;
+}
+/**
+ * The evidence behind a card (DEC-029): every input and result as a line with its source, how sure the answer is and why, how fresh the data is, and the platform's verification. The capability writes lines, confidence and freshness; only the platform writes verification, after the grounding verifier has passed.
+ */
+export interface Receipt {
+  /**
+   * @minItems 1
+   * @maxItems 20
+   */
+  lines: [ReceiptLine, ...ReceiptLine[]];
+  confidence: ReceiptConfidence;
+  freshness: ReceiptFreshness;
+  verification?: ReceiptVerification;
+}
+export interface ReceiptLine {
+  key: string;
+  label: LText;
+  money?: Money;
+  text?: string;
+  epistemic: Epistemic;
+  source: "camera" | "user" | "engine" | "coach" | "platform" | "fixture";
+  ref?: Ref;
+  note?: LText;
+}
+export interface ReceiptConfidence {
+  /**
+   * confident: answered without reservations. caveated: answered, with reasons shown. abstained: no verdict was given, because the data could not support one.
+   */
+  state: "confident" | "caveated" | "abstained";
+  /**
+   * @maxItems 8
+   */
+  reasons: ReceiptReason[];
+}
+export interface ReceiptReason {
+  code: string;
+  text: LText;
+  blocks_verdict: boolean;
+}
+export interface ReceiptFreshness {
+  as_of: Timestamp;
+  source: string;
+  /**
+   * True for synthetic or fixture data, and for a simulated date.
+   */
+  simulated: boolean;
+}
+export interface ReceiptVerification {
+  status: "verified" | "failed";
+  checked_values: number;
+  calc_ids: Ref[];
+  digest: Sha256;
+  /**
+   * Compact JWS (ES256) by the platform over {card_id, digest, calc_ids, status, signed_at}.
+   */
+  signature: string;
+  key_id: string;
+  signed_at: Timestamp;
 }
 export interface RenderHints {
   /**

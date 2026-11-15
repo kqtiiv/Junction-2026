@@ -3,10 +3,11 @@ import { SBankCoachAdapter } from "../src/capabilities/sbank-coach/adapter.ts";
 import type { AgentBackend } from "../src/capabilities/sbank-coach/backend.ts";
 import { DeterministicFastPath } from "../src/capabilities/sbank-coach/fast-path.ts";
 import type { FinanceEngine } from "../src/capabilities/sbank-coach/finance-engine.ts";
-import { FixtureFinanceEngine } from "../src/capabilities/sbank-coach/fixture-engine.ts";
+import { FixtureFinanceEngine, type FixtureScenario } from "../src/capabilities/sbank-coach/fixture-engine.ts";
 import { UserStatedFinanceEngine } from "../src/capabilities/sbank-coach/user-stated-engine.ts";
 import type { DomainResponseEvent, ErrorEnvelope, VoiceIntent } from "../src/contracts.ts";
 import { loadSigningKeys } from "../src/crypto.ts";
+import { FixtureLabelReader, type LabelFixture } from "../src/platform/label-reader.ts";
 import { CapabilityRegistry } from "../src/platform/registry.ts";
 import { buildServer } from "../src/server.ts";
 
@@ -14,19 +15,25 @@ export const TOKEN = "test-token";
 export const USER = "u_7f3a";
 export const auth = { authorization: `Bearer ${TOKEN}` };
 
-export function makeApp(opts: { remote?: AgentBackend; deadlineMs?: number; userStated?: { now: () => Date }; engine?: FinanceEngine } = {}) {
+export function makeApp(opts: {
+  remote?: AgentBackend; deadlineMs?: number; userStated?: { now: () => Date }; engine?: FinanceEngine;
+  /** Synthetic fixture scenario (DEC-030). */ scenario?: FixtureScenario;
+  /** What the label reader returns, capture by capture. */ labels?: LabelFixture[];
+  proposalTtlMs?: number;
+} = {}) {
   const keys = loadSigningKeys();
   const engine: FinanceEngine = opts.engine
-    ?? (opts.userStated ? new UserStatedFinanceEngine(opts.userStated.now) : new FixtureFinanceEngine());
-  const fastPath = new DeterministicFastPath(engine, keys.publicKey);
+    ?? (opts.userStated ? new UserStatedFinanceEngine(opts.userStated.now) : new FixtureFinanceEngine({ scenario: opts.scenario ?? "default" }));
+  const fastPath = new DeterministicFastPath(engine, keys.publicKey, opts.proposalTtlMs ? { proposalTtlMs: opts.proposalTtlMs } : {});
   const registry = new CapabilityRegistry();
   registry.register(new SBankCoachAdapter({ engine, fastPath, ...(opts.remote ? { remote: opts.remote } : {}) }));
   const app = buildServer({
     registry, keys,
     tokens: new Map([[TOKEN, USER], ["other-token", "u_other"]]),
+    ...(opts.labels ? { labelReader: new FixtureLabelReader(opts.labels) } : {}),
     ...(opts.deadlineMs ? { deadlineMs: opts.deadlineMs } : {}),
   });
-  return { app, engine, keys };
+  return { app, engine, keys, fastPath };
 }
 
 export async function grantConsent(app: FastifyInstance, purposes = ["price_label", "receipt"], headers = auth): Promise<string> {

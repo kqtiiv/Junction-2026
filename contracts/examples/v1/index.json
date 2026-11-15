@@ -320,6 +320,16 @@
       "schema": "finance/finance_tool_result.schema.json",
       "valid": false,
       "reason": "Until-payday affordability must say what is left per day"
+    },
+    {
+      "file": "valid/insight_card.purchase_receipt.json",
+      "schema": "insight_card.schema.json",
+      "valid": true
+    },
+    {
+      "file": "invalid/insight_card.receipt_verification_unsigned.json",
+      "schema": "insight_card.schema.json",
+      "valid": false
     }
   ]
 }

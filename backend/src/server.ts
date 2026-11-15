@@ -3,10 +3,11 @@ import { createHash, randomUUID } from "node:crypto";
 import multipart from "@fastify/multipart";
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import {
-  validate, type ContextCapture, type DomainRequest, type DomainResponse, type DomainResponseEvent, type ErrorEnvelope,
+  validate, type ContextCapture, type DomainRequest, type DomainResponse, type DomainResponseEvent, type ErrorEnvelope, type InsightCard,
   type Observation, type VoiceIntent,
 } from "./contracts.ts";
-import type { SigningKeys } from "./crypto.ts";
+import { payloadHash, signJws, verifyJws, type SigningKeys } from "./crypto.ts";
+import { cardFigures } from "./sdk/verifier.ts";
 import { CaptureStore, CAPTURE_TTL_MS } from "./platform/captures.ts";
 import { ConsentRegistry } from "./platform/consent.ts";
 import { inspectImage, MAX_IMAGE_BYTES } from "./platform/image.ts";
@@ -68,6 +69,68 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     const userRef = token ? deps.tokens.get(token) : undefined;
     if (!userRef) throw new PlatformError("UNAUTHENTICATED");
     req.userRef = userRef;
+  });
+
+  // ---------------------------------------------------------------- receipts (DEC-029)
+  // A card reaches a client only after the grounding verifier passed. The platform then signs
+  // its receipt: a digest of the whole card (minus the signature) and the calc_ids it cites.
+  const receiptClaims = (card: InsightCard, digest: string, v: { status: string; signed_at: string; calc_ids: string[] }) =>
+    ({ card_id: card.card_id, digest, calc_ids: v.calc_ids, status: v.status, signed_at: v.signed_at });
+  const unsignedDigest = (card: InsightCard) => {
+    const { verification: _v, ...rest } = card.receipt!;
+    return payloadHash({ ...card, receipt: rest });
+  };
+  const signCard = (card: InsightCard): InsightCard => {
+    if (!card.receipt) return card;
+    const { verification: _old, ...rest } = card.receipt;
+    const base: InsightCard = { ...card, receipt: rest };
+    const digest = unsignedDigest(base);
+    const v = { status: "verified" as const, signed_at: new Date().toISOString(), calc_ids: card.basis.calc_ids };
+    return { ...card, receipt: { ...rest, verification: {
+      ...v, checked_values: cardFigures(card).length, digest, signature: signJws(receiptClaims(card, digest, v), deps.keys), key_id: deps.keys.kid,
+    } } };
+  };
+  /** Signs every card in an event once per turn, so the card event and the final carry the same receipt. */
+  const signEvent = (e: DomainResponseEvent, cache: Map<string, InsightCard>): DomainResponseEvent => {
+    const signed = (c: InsightCard) => cache.get(c.card_id) ?? (cache.set(c.card_id, signCard(c)), cache.get(c.card_id)!);
+    if (e.type === "card") return { ...e, card: signed(e.card) };
+    if (e.type === "final") return { ...e, response: { ...e.response, cards: e.response.cards.map(signed) } } as DomainResponseEvent;
+    return e;
+  };
+
+  app.get("/v1/receipts/public-key", async () => ({
+    key_id: deps.keys.kid, alg: "ES256",
+    public_key_pem: deps.keys.publicKey.export({ type: "spki", format: "pem" }).toString(),
+  }));
+
+  /** Independent check of a receipt a client sends back: signature, digest, and the figures against the calculation log. */
+  app.post("/v1/receipts/verify", async (req) => {
+    const card = (req.body as { card?: InsightCard })?.card;
+    if (!card || typeof card !== "object" || !card.receipt) throw new PlatformError("VALIDATION_FAILED", { detail: "body must be { card } with a receipt" });
+    const v = card.receipt.verification;
+    if (!v) return { valid: false, signature_valid: false, digest_matches: false, grounded: false, reason: "UNSIGNED", unverified: [] };
+    const digest = unsignedDigest(card);
+    const digestMatches = digest === v.digest;
+    const signatureValid = verifyJws(v.signature, receiptClaims(card, digest, v), deps.keys.publicKey);
+    const cap = deps.registry.get(card.capability_id);
+    const ground = cap?.adapter.verifyCard
+      ? await cap.adapter.verifyCard(card, req.userRef!)
+      : { grounded: false, checked_values: 0, unverified: ["NO_VERIFIER"] };
+    // Observed figures (a price read from a label) are checked against this user's stored observations.
+    let grounded = ground.grounded;
+    let unverified = ground.unverified;
+    if (!grounded && card.basis.observation_ids?.length) {
+      const obs = captures.observations(req.userRef!, card.basis.observation_ids);
+      const seen = new Set(obs.flatMap((o) => o.items.map((i) => i.price?.amount).filter(Boolean) as string[]));
+      unverified = unverified.filter((u) => !seen.has(u));
+      grounded = unverified.length === 0;
+    }
+    return {
+      valid: digestMatches && signatureValid && grounded,
+      signature_valid: signatureValid, digest_matches: digestMatches, grounded,
+      checked_values: ground.checked_values, unverified, key_id: v.key_id,
+      ...(digestMatches ? {} : { reason: "MODIFIED" }),
+    };
   });
 
   const requireValid = (schema: Parameters<typeof validate>[0], body: unknown) => {
@@ -194,7 +257,8 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     const entry = ledger.get(body.proposal_id, req.userRef!);
     if (!entry) throw new PlatformError("PROPOSAL_NOT_FOUND");
     const session = sessions.get(entry.sessionId, req.userRef!);
-    return confirmProposal(entry, session, { decision: body.decision, channel: body.channel, evidence: body.evidence }, deps);
+    const result = await confirmProposal(entry, session, { decision: body.decision, channel: body.channel, evidence: body.evidence }, deps);
+    return result.card ? { ...result, card: signCard(result.card) } : result;
   });
 
   // ---------------------------------------------------------------- turns (SSE)
@@ -222,7 +286,8 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     };
 
     const sent: DomainResponseEvent[] = [];
-    const emit = (e: DomainResponseEvent) => { writeEvent(e); sent.push(e); };
+    const signedCards = new Map<string, InsightCard>();
+    const emit = (raw: DomainResponseEvent) => { const e = signEvent(raw, signedCards); writeEvent(e); sent.push(e); };
     const locale = intent.transcript?.lang ?? session.locale;
 
     try {

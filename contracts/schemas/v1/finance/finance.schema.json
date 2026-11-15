@@ -24,7 +24,9 @@
         "HISTORY_LT_4_WEEKS",
         "COMMITMENT_ESTIMATED",
         "RECEIPT_UNMATCHED",
-        "PRICE_UNCERTAIN"
+        "PRICE_UNCERTAIN",
+        "COMMITMENT_UNKNOWN",
+        "SOURCE_CONFLICT"
       ]
     },
     "FinanceIntent": {
@@ -71,7 +73,8 @@
         "finance.calculate_affordability",
         "finance.process_receipt",
         "finance.propose_classification_change",
-        "finance.get_calculation"
+        "finance.get_calculation",
+        "finance.summarize_decisions"
       ]
     },
     "SafeToSpendResult": {

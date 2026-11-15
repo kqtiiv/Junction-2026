@@ -45,6 +45,21 @@ function moneyAmounts(node: unknown, out: string[] = []): string[] {
   return out;
 }
 
+/**
+ * Every figure on a card that must trace to a calculation or an observation: money on the
+ * primary value, the rows and the receipt lines, plus the decimals in a receipt's calculation
+ * line ("90.16 − 79.90 = 10.26"). Signs are ignored (a shortfall is shown as a negative).
+ */
+export function cardFigures(card: InsightCard): string[] {
+  const figures = moneyAmounts([card.primary, card.rows, card.receipt?.lines]);
+  for (const line of card.receipt?.lines ?? []) {
+    if (line.key === "calculation" && line.text) {
+      for (const m of line.text.matchAll(/-?\d+\.\d{2}/g)) figures.push(m[0].replace(/^-/, ""));
+    }
+  }
+  return figures;
+}
+
 export async function verifyResponse(
   response: DomainResponse,
   userRef: string,
@@ -76,7 +91,7 @@ export async function verifyResponse(
   const verifiedCards: InsightCard[] = [];
   const droppedCards: string[] = [];
   for (const card of response.cards) {
-    const amounts = moneyAmounts([card.primary, card.rows]);
+    const amounts = cardFigures(card);
     checked += amounts.length;
     const bad = amounts.filter((a) => !exact.has(a));
     const unresolved = card.basis.calc_ids.filter((id) => !resolvedCalcIds.includes(id));

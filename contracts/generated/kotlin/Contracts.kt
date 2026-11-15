@@ -293,6 +293,8 @@ data class InsightCard (
     @SerialName("proposal_ids")
     val proposalIDS: List<String>? = null,
 
+    val receipt: Receipt? = null,
+
     @SerialName("render_hints")
     val renderHints: RenderHints? = null,
 
@@ -377,6 +379,116 @@ data class Money (
 @Serializable
 enum class Currency(val value: String) {
     @SerialName("EUR") Eur("EUR");
+}
+
+/**
+ * The evidence behind a card (DEC-029): every input and result as a line with its source,
+ * how sure the answer is and why, how fresh the data is, and the platform's verification.
+ * The capability writes lines, confidence and freshness; only the platform writes
+ * verification, after the grounding verifier has passed.
+ */
+@Serializable
+data class Receipt (
+    val confidence: ReceiptConfidence,
+    val freshness: ReceiptFreshness,
+    val lines: List<ReceiptLine>,
+    val verification: ReceiptVerification? = null
+)
+
+@Serializable
+data class ReceiptConfidence (
+    val reasons: List<ReceiptReason>,
+
+    /**
+     * confident: answered without reservations. caveated: answered, with reasons shown.
+     * abstained: no verdict was given, because the data could not support one.
+     */
+    val state: State
+)
+
+@Serializable
+data class ReceiptReason (
+    @SerialName("blocks_verdict")
+    val blocksVerdict: Boolean,
+
+    val code: String,
+    val text: Map<String, String>
+)
+
+/**
+ * confident: answered without reservations. caveated: answered, with reasons shown.
+ * abstained: no verdict was given, because the data could not support one.
+ */
+@Serializable
+enum class State(val value: String) {
+    @SerialName("abstained") Abstained("abstained"),
+    @SerialName("caveated") Caveated("caveated"),
+    @SerialName("confident") Confident("confident");
+}
+
+@Serializable
+data class ReceiptFreshness (
+    @SerialName("as_of")
+    val asOf: String,
+
+    /**
+     * True for synthetic or fixture data, and for a simulated date.
+     */
+    val simulated: Boolean,
+
+    val source: String
+)
+
+@Serializable
+data class ReceiptLine (
+    val epistemic: Epistemic,
+    val key: String,
+    val label: Map<String, String>,
+    val money: Money? = null,
+    val note: Map<String, String>? = null,
+    val ref: String? = null,
+    val source: LineSource,
+    val text: String? = null
+)
+
+@Serializable
+enum class LineSource(val value: String) {
+    @SerialName("camera") Camera("camera"),
+    @SerialName("coach") Coach("coach"),
+    @SerialName("engine") Engine("engine"),
+    @SerialName("fixture") Fixture("fixture"),
+    @SerialName("platform") Platform("platform"),
+    @SerialName("user") User("user");
+}
+
+@Serializable
+data class ReceiptVerification (
+    @SerialName("calc_ids")
+    val calcIDS: List<String>,
+
+    @SerialName("checked_values")
+    val checkedValues: Long,
+
+    val digest: String,
+
+    @SerialName("key_id")
+    val keyID: String,
+
+    /**
+     * Compact JWS (ES256) by the platform over {card_id, digest, calc_ids, status, signed_at}.
+     */
+    val signature: String,
+
+    @SerialName("signed_at")
+    val signedAt: String,
+
+    val status: VerificationStatus
+)
+
+@Serializable
+enum class VerificationStatus(val value: String) {
+    @SerialName("failed") Failed("failed"),
+    @SerialName("verified") Verified("verified");
 }
 
 @Serializable
@@ -553,7 +665,7 @@ data class ContextCapture (
     @SerialName("session_id")
     val sessionID: String,
 
-    val source: Source,
+    val source: ContextCaptureSource,
     val trigger: Trigger,
 
     @SerialName("user_ref")
@@ -600,7 +712,7 @@ enum class ContextCaptureSchema(val value: String) {
 }
 
 @Serializable
-enum class Source(val value: String) {
+enum class ContextCaptureSource(val value: String) {
     @SerialName("glasses_photo") GlassesPhoto("glasses_photo"),
     @SerialName("glasses_stream_frame") GlassesStreamFrame("glasses_stream_frame"),
     @SerialName("phone_camera") PhoneCamera("phone_camera"),
@@ -1563,7 +1675,8 @@ enum class FinanceToolName(val value: String) {
     @SerialName("finance.get_upcoming_commitments") FinanceGetUpcomingCommitments("finance.get_upcoming_commitments"),
     @SerialName("finance.process_receipt") FinanceProcessReceipt("finance.process_receipt"),
     @SerialName("finance.propose_classification_change") FinanceProposeClassificationChange("finance.propose_classification_change"),
-    @SerialName("finance.simulate_spending_change") FinanceSimulateSpendingChange("finance.simulate_spending_change");
+    @SerialName("finance.simulate_spending_change") FinanceSimulateSpendingChange("finance.simulate_spending_change"),
+    @SerialName("finance.summarize_decisions") FinanceSummarizeDecisions("finance.summarize_decisions");
 }
 
 /**
@@ -1682,11 +1795,13 @@ data class MissingData (
 enum class MissingDataCode(val value: String) {
     @SerialName("BALANCE_STALE") BalanceStale("BALANCE_STALE"),
     @SerialName("COMMITMENT_ESTIMATED") CommitmentEstimated("COMMITMENT_ESTIMATED"),
+    @SerialName("COMMITMENT_UNKNOWN") CommitmentUnknown("COMMITMENT_UNKNOWN"),
     @SerialName("HISTORY_LT_4_WEEKS") HistoryLt4_Weeks("HISTORY_LT_4_WEEKS"),
     @SerialName("INCOME_NOT_DETECTED") IncomeNotDetected("INCOME_NOT_DETECTED"),
     @SerialName("NO_BALANCE") NoBalance("NO_BALANCE"),
     @SerialName("PRICE_UNCERTAIN") PriceUncertain("PRICE_UNCERTAIN"),
-    @SerialName("RECEIPT_UNMATCHED") ReceiptUnmatched("RECEIPT_UNMATCHED");
+    @SerialName("RECEIPT_UNMATCHED") ReceiptUnmatched("RECEIPT_UNMATCHED"),
+    @SerialName("SOURCE_CONFLICT") SourceConflict("SOURCE_CONFLICT");
 }
 
 /**

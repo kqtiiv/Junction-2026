@@ -48,6 +48,7 @@
     "assumptions": { "type": "array", "items": { "$ref": "common.schema.json#/definitions/LText" } },
     "missing_data": { "type": "array", "items": { "$ref": "common.schema.json#/definitions/LText" } },
     "proposal_ids": { "type": "array", "items": { "$ref": "common.schema.json#/definitions/Ref" } },
+    "receipt": { "$ref": "#/definitions/Receipt" },
     "render_hints": {
       "title": "RenderHints",
       "type": "object",
@@ -64,6 +65,83 @@
     }
   },
   "definitions": {
+    "Receipt": {
+      "title": "Receipt",
+      "description": "The evidence behind a card (DEC-029): every input and result as a line with its source, how sure the answer is and why, how fresh the data is, and the platform's verification. The capability writes lines, confidence and freshness; only the platform writes verification, after the grounding verifier has passed.",
+      "type": "object",
+      "required": ["lines", "confidence", "freshness"],
+      "properties": {
+        "lines": { "type": "array", "minItems": 1, "maxItems": 20, "items": { "$ref": "#/definitions/ReceiptLine" } },
+        "confidence": {
+          "title": "ReceiptConfidence",
+          "type": "object",
+          "required": ["state", "reasons"],
+          "properties": {
+            "state": {
+              "description": "confident: answered without reservations. caveated: answered, with reasons shown. abstained: no verdict was given, because the data could not support one.",
+              "type": "string",
+              "enum": ["confident", "caveated", "abstained"]
+            },
+            "reasons": { "type": "array", "maxItems": 8, "items": { "$ref": "#/definitions/ReceiptReason" } }
+          },
+          "additionalProperties": false
+        },
+        "freshness": {
+          "title": "ReceiptFreshness",
+          "type": "object",
+          "required": ["as_of", "source", "simulated"],
+          "properties": {
+            "as_of": { "$ref": "common.schema.json#/definitions/Timestamp" },
+            "source": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+            "simulated": { "description": "True for synthetic or fixture data, and for a simulated date.", "type": "boolean" }
+          },
+          "additionalProperties": false
+        },
+        "verification": {
+          "title": "ReceiptVerification",
+          "type": "object",
+          "required": ["status", "checked_values", "calc_ids", "digest", "signature", "key_id", "signed_at"],
+          "properties": {
+            "status": { "type": "string", "enum": ["verified", "failed"] },
+            "checked_values": { "type": "integer", "minimum": 0 },
+            "calc_ids": { "type": "array", "items": { "$ref": "common.schema.json#/definitions/Ref" } },
+            "digest": { "$ref": "common.schema.json#/definitions/Sha256" },
+            "signature": { "description": "Compact JWS (ES256) by the platform over {card_id, digest, calc_ids, status, signed_at}.", "type": "string", "maxLength": 2000 },
+            "key_id": { "type": "string", "maxLength": 100 },
+            "signed_at": { "$ref": "common.schema.json#/definitions/Timestamp" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "ReceiptLine": {
+      "title": "ReceiptLine",
+      "type": "object",
+      "required": ["key", "label", "epistemic", "source"],
+      "properties": {
+        "key": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "label": { "$ref": "common.schema.json#/definitions/LText" },
+        "money": { "$ref": "common.schema.json#/definitions/Money" },
+        "text": { "type": "string", "maxLength": 200 },
+        "epistemic": { "$ref": "common.schema.json#/definitions/Epistemic" },
+        "source": { "type": "string", "enum": ["camera", "user", "engine", "coach", "platform", "fixture"] },
+        "ref": { "$ref": "common.schema.json#/definitions/Ref" },
+        "note": { "$ref": "common.schema.json#/definitions/LText" }
+      },
+      "additionalProperties": false
+    },
+    "ReceiptReason": {
+      "title": "ReceiptReason",
+      "type": "object",
+      "required": ["code", "text", "blocks_verdict"],
+      "properties": {
+        "code": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
+        "text": { "$ref": "common.schema.json#/definitions/LText" },
+        "blocks_verdict": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
     "CardValue": {
       "title": "CardValue",
       "type": "object",
