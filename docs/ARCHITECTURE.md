@@ -126,7 +126,7 @@ flowchart TB
   end
 
   subgraph L8["L8 · UI & observability"]
-    PHONEUI["Phone UI: card renderer, confirm sheet,<br/>consent, phone-only mode"]:::reusable
+    PHONEUI["Phone UI: card renderer, confirm panel,<br/>consent, phone-only mode"]:::reusable
     GLUI["Glasses display renderer (optional)"]:::reusable
     OBS["Tracing, metrics, debug overlay<br/>(backend, mock, experimental set, verified)"]:::reusable
   end
@@ -207,7 +207,7 @@ sequenceDiagram
   A-->>O: DomainResponse (verified)
   O->>P: speech (≤25 words) + InsightCards + ActionProposal
   P->>G: TTS over Bluetooth (A2DP or HFP)
-  Note over P: Card on the phone; confirm sheet if a proposal exists.<br/>Gesture confirm only now that the stream has stopped (DEC-007)
+  Note over P: Card on the phone; confirm panel if a proposal exists.<br/>Gesture confirm only now that the stream has stopped (DEC-007)
   Note over A,C: Agent slow (>3.5 s) or unhealthy → deterministic fast path (A→E→template)
   opt user says "stop" / barges in
     P->>P: flush TTS immediately
@@ -229,7 +229,7 @@ A voice-only turn (e.g. "what's safe to spend this week?") is the same flow with
 | **L5 S-Bank Coach adapter** | Maps platform contracts to and from the Coach agent. Selects the backend (remote agent / on-device agent / deterministic fast path). Normalises outputs to `InsightCard` / `ActionProposal`. Enforces epistemic labels and the speech budget. Verifies calc ids against the engine. | `DomainRequest` → agent turn → `DomainResponse` | Backend → phone too when the agent runs on-device | Finance-only (the pattern is reusable) | Agent slow or down → fast path for supported intents. Verification fails → drop the unverified sentence, keep verified cards, log an incident. Unsupported intent → honest "I can't do that yet". |
 | **L6 Finance engine** | Ledger queries, three-basket classification, safe-to-spend, simulations, affordability, receipt matching, **calculation log**. Pure, Decimal-based, versioned. | Typed tool inputs → `ToolResult` with `calc_id` | Backend → portable later (pure functions plus golden fixtures make a port verifiable) | Finance-only | Missing data → lower data mode (`balance` → `budget` → `pace`) plus `missing_data`. Internal error → typed `ok:false`. Never a guess. |
 | **L7 Data / retrieval** | Platform stores (sessions, consents, proposals, ephemeral media with TTL, telemetry); finance ledger; **education corpus with retrieval for explanations only**. | Writes and reads by layer | Backend (managed DB, object store) | Platform stores yes; ledger and corpus finance-only (the retrieval service is reusable) | DB down → read-only cached cards, no proposals. Retrieval down → answer without the educational paragraph. |
-| **L8 UI & observability** | Phone UI: schema-driven card renderer, confirmation sheet, consent screens, phone-only mode. Optional glasses-display renderer. Tracing, metrics, evaluation dashboards. | `InsightCard`, `ActionProposal`, telemetry events → screens, dashboards | Phone (WebView or native) + glasses display + ops backend | Yes. New domains get UI without frontend code. | Unknown card type → generic "key/value" fallback rendering. Telemetry outage never blocks the user path. |
+| **L8 UI & observability** | Phone UI: schema-driven card renderer, confirmation panel (docked above the input bar, DEC-027), consent screens, phone-only mode. Optional glasses-display renderer. Tracing, metrics, evaluation dashboards. | `InsightCard`, `ActionProposal`, telemetry events → screens, dashboards | Phone (WebView or native) + glasses display + ops backend | Yes. New domains get UI without frontend code. | Unknown card type → generic "key/value" fallback rendering. Telemetry outage never blocks the user path. |
 
 ### 2.4 Glasses and device lifecycle (L2) — DEC-005
 
@@ -1030,7 +1030,7 @@ The platform's fixture runner replays the golden files through the **adapter** (
 | Contracts package (JSON Schema + generated types) for §3 | Notification delivery (show one `DomainEvent` as an in-app banner) | Production publishing, real bank integration, PSD2 |
 | `SBankCoachAdapter` with **RemoteAgentBackend + DeterministicFastPath + calc_id verification** | Coach agent: if not ready, the fast path stands in (templates for 4 intents) | Biometric confirmation, data-deletion flow on glasses |
 | Finance tools for 4 intents: safe-to-spend, spend query, receipt scan/link, classification proposal (from the Coach team, or the reference engine in `finance/REFERENCE_DESIGN.md`) | | Shadow/canary rollout tooling (document it only) |
-| Phone UI: generic card renderer, confirm sheet, **phone-only mode** | | Swedish beyond i18n keys |
+| Phone UI: generic card renderer, confirm panel, **phone-only mode** | | Swedish beyond i18n keys |
 | Minimal tracing: per-turn latency breakdown (incl. stream start → photo), backend used, verification result, `glasses_backend` and active experimental features (shown in a debug overlay) | Glasses: Meta **Mock Device Kit** for development and UI tests, incl. display and voice-invocation simulation since 1.0.0. Always shown as `mock` in the overlay. | Full evaluation dashboards |
 | Hour-0 device gate: a scripted check on the real glasses that sets the experimental flags (DEC-022) | Seeded demo image if a live capture is unusable | Experimental DAT features in any production or release-channel build (DEC-004) |
 | | | `AuditEvent`, `ConsentGrant` and scopes, confirmation hardening (proposed: DEC-012 to DEC-014) |
@@ -1086,7 +1086,7 @@ The platform's fixture runner replays the golden files through the **adapter** (
 | **1. Glasses / native companion** | App builds on the real phone; DAT registration through the Meta AI app (Developer Mode); the four lifecycles logged on screen; HFP mic recording plays back; **hour-0 device gate run and flags set** (DEC-022); stream-start → photo latency measured | `DeviceSessionState`, `VoiceIntent` + `ContextCapture` (posted to a stub endpoint that echoes them) | The backend (echo server); DAT via Meta's **Mock Device Kit** (since 1.0.0 it also simulates display, inputs and voice invocations), always labelled `mock` | Experimental features (voice invocation, Inputs) unavailable or unapproved on the team's device; voice invocation needs Developer Center approval and a spoken app name; Finnish ASR over narrow-band HFP audio |
 | **2. Platform contracts + backend** | `contracts/` with JSON Schemas + generated types for §3; orchestrator skeleton: `POST /turn` → stub capability → canned `DomainResponse`; proposal ledger + signing key | `AgentOrchestratorAdapter` + `DomainResponse` | All capabilities (canned responses); consent (single grant) | Contract churn. Freeze v1 at hour 4 and allow additive changes only. |
 | **3. S-Bank Coach adapter** | Adapter with `DeterministicFastPath` answering `finance.safe_to_spend` from fixture `ToolResult`s; calc-id verifier against a fixture calculation store | `POST /v1/turn` (agent) + `platform.tool_result/v1` (engine) agreed **with the Coach team** | The Coach agent (fast path) and the engine (fixtures from `finance/REFERENCE_DESIGN.md` personas) | The Coach team's agent arrives late, or without `calc_id`s or the envelope. Agree the envelope at hour 1. |
-| **4. Frontend / demo / pitch** | Generic `InsightCard` renderer + confirm sheet rendering the §3.6/§3.7 examples; phone-only mode screen; demo script draft | `InsightCard` + `ActionProposal` | All data (static JSON cards) | Cards that look generic or dull. Budget time for one polished visual style. |
+| **4. Frontend / demo / pitch** | Generic `InsightCard` renderer + confirm panel rendering the §3.6/§3.7 examples; phone-only mode screen; demo script draft | `InsightCard` + `ActionProposal` | All data (static JSON cards) | Cards that look generic or dull. Budget time for one polished visual style. |
 
 ### 8.2 Timeline
 

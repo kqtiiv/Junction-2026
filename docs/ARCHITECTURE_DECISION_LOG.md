@@ -38,6 +38,7 @@ The canonical record of every material decision on the glasses platform and its 
 | [DEC-024](#dec-024--the-s-bank-coach-teams-python-engine-runs-behind-a-thin-http-service-that-converts-to-our-contracts) | The S-Bank Coach team's Python engine runs behind a thin HTTP service that converts to our contracts | accepted | finance |
 | [DEC-025](#dec-025--money-answers-follow-the-engine-safe-to-spend-today-until-payday-not-per-week) | Money answers follow the engine: safe to spend today, until payday, not per week | accepted | finance |
 | [DEC-026](#dec-026--s-bank-is-dropped-from-the-project-the-finance-capability-becomes-the-teams-money-coach) | S-Bank is dropped from the project; the finance capability becomes the team's money coach | accepted | platform |
+| [DEC-027](#dec-027--the-phone-app-has-one-bold-element-the-answers-figure-on-a-price-tag-and-the-decision-docks-above-the-input-bar) | The phone app has one bold element (the answer's figure on a price tag), and the decision docks above the input bar | accepted | companion |
 
 ---
 
@@ -1487,3 +1488,57 @@ The canonical record of every material decision on the glasses platform and its 
 
 ### Revisit triggers
 - Revisit this decision after the hackathon (do the rename), or if the organisers say the dataset is only for the S-Pankki challenge (switch the demo to `user_stated`).
+
+## DEC-027 — The phone app has one bold element (the answer's figure on a price tag), and the decision docks above the input bar
+
+- Status: accepted
+- Date: 2026-11-15
+- Owner: companion UI
+- Scope: companion
+- Decision:
+  - The phone UI gets one visual identity taken from the shop aisle. The card's primary figure is set like a shelf-edge price label (heavy compressed numerals on a yellow tag), and everything around it is quiet: an aisle-white ground, spruce-ink text, hairline borders and no shadows. The UI uses system fonts only and supports dark mode.
+  - The confirm decision is no longer a sheet that covers the answer. It docks above the input bar while a proposal waits, so the card it changes stays visible. The primary action is one full-width button; "Not now" is quiet.
+  - Epistemic labels become a coloured dot plus the word, never colour alone.
+  - The phone shows "Working on it…" while a turn runs, and an empty state tells the user what to ask.
+  - The debug overlay keeps its exact text (DEC-005, and the UI test asserts on it), restyled as a slim strip.
+  - The card renderer stays generic (`InsightCard` only, no capability-specific views).
+
+### Context
+- **Problem being solved:** in the CI screenshots, the debug strip was the most prominent element; the confirm sheet blurred the card it asked about; the coloured labels competed with the numbers; and nothing showed during an 8.8 s turn. The user asked for a simple redesign that looks good.
+- **Requirements and constraints:** no contract changes; the UI test's identifiers (`allowConsent`, `menu`, `connectGlasses`, `askField`, `confirmProposal`, `lastSpeech`, `debugOverlay`) and the text it asserts must stay; mocks stay visible (DEC-005); every task still works without glasses (DEC-003).
+- **Assumptions:** [assumption] the iOS build compiles in CI. `CompanionUI` is iOS-only and can't be compiled on the Linux dev machine.
+- **Non-goals:** the glasses display renderer (still behind `display_output`, DEC-003); spoken wording and earcons (a separate change to `fast-path.ts` and `Speech.swift`).
+
+### Options considered
+| Option | Advantages | Disadvantages | Why accepted or rejected |
+|---|---|---|---|
+| Price-tag figure, quiet surroundings, docked decision | Grounded in the moment of use; one memorable element; nothing new to bundle | One more yellow in the palette to keep legible in dark mode (handled: dark text on the tag in both modes) | **Accepted** |
+| Keep the stock SwiftUI look | No risk | Reads as a debug build; the sheet hides the answer | Rejected |
+| Bundle a custom typeface | More distinctive type | Font files, `UIAppFonts` and licence checks hours before judging | Rejected for now |
+| Capability-specific verdict view (e.g. a spend bar) | Richer visual for the money coach | Breaks the generic renderer (L8); needs fields the contract doesn't carry | Rejected; revisit with a contract change |
+
+### Evidence and sources
+| Source | Type | Specific finding used | Why this source is trustworthy | Accessed |
+|---|---|---|---|---|
+| S09 (https://wearables.developer.meta.com/docs/develop/webapps/design/guides/screen-layout/) | Official docs | [fact] Dock actions at the bottom, below the content they affect; one primary action per detail | Meta's own UI toolkit guidance | 2026-11-15 |
+| S09 (https://wearables.developer.meta.com/llms.txt?product=all&version=1.0&document=products/webapps/sections/guides/build/display-and-layout) | Official docs | [fact] "Communicate state with structure or text as well as color" | Meta's own display guidance | 2026-11-15 |
+| S24 (https://design.google/library/transparent-screens) | Industry research (Google) | [fact] Glanceable, brief content; colour used sparingly for key elements | Published design research from a glasses platform team | 2026-11-15 |
+| CI screenshots `docs/images/2-answer-and-proposal.png`, `3-confirmed.png` | Project artefact | [fact] Sheet covers the card; the debug strip dominates; 8780 ms turn | Generated by the UI test | 2026-11-15 |
+| Mock-ups (https://claude.ai/artifact/7F6t7uXGwCpCFA1kcFvKub) | Team design artefact | [inference] The layout this decision implements | Our own proposal | 2026-11-15 |
+
+### Implementation
+- **Components affected:** `companion-ios/Sources/CompanionUI/Views.swift` only (`Look` tokens, `PriceTag`, `ProposalPanel` replacing `ProposalSheet`, `ConsentView`, `CompanionScreen`).
+- **Contracts or schemas affected:** none.
+- **Configuration / feature flags:** none. The debug overlay toggle is unchanged (on by default).
+- **Tests or demo checks required:** the iOS workflow (build + `CompanionUITests`) must pass; check its new screenshots in light and dark mode before replacing `docs/images/`.
+- **Migration or rollback plan:** revert the one file.
+
+### Consequences
+- **Benefits:** the answer reads at a glance; the decision and what it changes are visible together; the app no longer looks like a debug build.
+- **Costs and limitations:** the README screenshots are out of date until CI regenerates them; `dismissProposal()` in the view model is now unused by the UI (a pending proposal still expires on the server).
+- **Failure behavior:** unchanged.
+- **Security/privacy implications:** none. The confirm path, signing and channels are unchanged (DEC-007, DEC-012, DEC-018).
+- **What this intentionally does not solve:** the glasses display and voice design (see the mock-ups).
+
+### Revisit triggers
+- Revisit this decision if the contract gains a verdict or breakdown field (a capability-aware visual becomes possible), if the demo uses a Ray-Ban Display (build the display renderer), or if testers misread the yellow tag as a price instead of what's left.
