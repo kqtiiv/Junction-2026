@@ -10,6 +10,8 @@ public final class CompanionViewModel: ObservableObject {
     @Published public private(set) var cards: [InsightCard] = []
     @Published public private(set) var proposal: ActionProposal?
     @Published public private(set) var lastSpeech = ""
+    /// What the user last asked (typed or spoken), shown above the answer. Decisions and "stop" don't replace it.
+    @Published public private(set) var lastQuestion = ""
     @Published public private(set) var partial = ""
     @Published public private(set) var listening = false
     @Published public private(set) var busy = false
@@ -118,6 +120,7 @@ public final class CompanionViewModel: ObservableObject {
         do {
             let outcome: TurnOutcome
             let pi = PlatformIntentGrammar.match(transcript.text)
+            if pi == nil { lastQuestion = transcript.text }
             // "no" / "confirm" only decide something when a proposal is actually waiting;
             // otherwise they are ordinary answers for the coach.
             let decides = (pi == .confirm || pi == .reject) && coordinator.pendingProposal != nil

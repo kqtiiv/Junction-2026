@@ -1500,6 +1500,9 @@ The canonical record of every material decision on the glasses platform and its 
   - The confirm decision is no longer a sheet that covers the answer. It docks above the input bar while a proposal waits, so the card it changes stays visible. The primary action is one full-width button; "Not now" is quiet.
   - Epistemic labels become a coloured dot plus the word, never colour alone.
   - The phone shows "Working on it…" while a turn runs, and an empty state tells the user what to ask.
+  - A custom header replaces the navigation bar: the wordmark, a glasses-status pill that names the state in words ("Glasses connected", "Simulated glasses", "Phone only"; tapping it connects), and the menu. The pill replaces the phone-only banner.
+  - The user's question is echoed above the answer (a new `lastQuestion` in the view model). Two suggested questions that the coach's grammar answers today sit above the input. The mic is the primary input; it turns into Stop while a turn runs.
+  - The debug overlay moves to the end of the content.
   - The debug overlay keeps its exact text (DEC-005, and the UI test asserts on it), restyled as a slim strip.
   - The card renderer stays generic (`InsightCard` only, no capability-specific views).
 
@@ -1527,11 +1530,11 @@ The canonical record of every material decision on the glasses platform and its 
 | Mock-ups (https://claude.ai/artifact/7F6t7uXGwCpCFA1kcFvKub) | Team design artefact | [inference] The layout this decision implements | Our own proposal | 2026-11-15 |
 
 ### Implementation
-- **Components affected:** `companion-ios/Sources/CompanionUI/Views.swift` only (`Look` tokens, `PriceTag`, `ProposalPanel` replacing `ProposalSheet`, `ConsentView`, `CompanionScreen`).
+- **Components affected:** `companion-ios/Sources/CompanionUI/Views.swift` (`Look` tokens, `PriceTag`, `ProposalPanel` replacing `ProposalSheet`, `GlassesStatus`, `ConsentView`, `CompanionScreen` without a `NavigationStack`) and `CompanionViewModel.swift` (`lastQuestion`).
 - **Contracts or schemas affected:** none.
 - **Configuration / feature flags:** none. The debug overlay toggle is unchanged (on by default).
 - **Tests or demo checks required:** the iOS workflow (build + `CompanionUITests`) must pass; check its new screenshots in light and dark mode before replacing `docs/images/`.
-- **Migration or rollback plan:** revert the one file.
+- **Migration or rollback plan:** revert the two files.
 
 ### Consequences
 - **Benefits:** the answer reads at a glance; the decision and what it changes are visible together; the app no longer looks like a debug build.

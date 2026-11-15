@@ -371,69 +371,124 @@ struct DebugOverlay: View {
 
 // MARK: Main screen
 
+/// Where the glasses stand, in words: the header pill. A mock is always named (DEC-005).
+struct GlassesStatus: View {
+    let mode: Contracts.Mode?
+    let backend: String
+    var body: some View {
+        HStack(spacing: 6) {
+            Circle().fill(dot).frame(width: 8, height: 8)
+            Text(label)
+        }
+        .font(.footnote.weight(.semibold))
+        .foregroundStyle(Look.ink)
+        .padding(.horizontal, 12)
+        .frame(height: 32)
+        .background(Look.shelf, in: Capsule())
+        .overlay(Capsule().strokeBorder(Look.line, lineWidth: 1))
+    }
+    private var connected: Bool { mode == .glasses }
+    private var label: String {
+        guard connected else { return "Phone only" }
+        return backend == "mock" ? "Simulated glasses" : "Glasses connected"
+    }
+    private var dot: Color {
+        guard connected else { return Look.slate }
+        return backend == "mock" ? Color(hex: 0xC07A12) : Color(hex: 0x2F7D52)
+    }
+}
+
 public struct CompanionScreen: View {
     @ObservedObject var model: CompanionViewModel
     @State private var typed = ""
     @State private var showDebug = true
+    @FocusState private var typing: Bool
 
     public init(model: CompanionViewModel) { self.model = model }
 
     private var locale: String { model.coordinator.config.locale }
+    private var onGlasses: Bool { model.deviceState?.mode == .glasses }
 
     public var body: some View {
         if !model.hasConsent {
             ConsentView { Task { await model.grantConsent() } }
                 .tint(Look.ink)
         } else {
-            NavigationStack {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
-                        if model.deviceState?.mode == .phoneOnly {
-                            Label("Glasses not connected. Continuing on your phone.", systemImage: "iphone")
-                                .font(.callout).foregroundStyle(Look.ink)
-                                .padding(12).frame(maxWidth: .infinity, alignment: .leading)
-                                .background(Look.notice, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-                        }
-                        if !model.lastSpeech.isEmpty { spokenLine }
-                        if let err = model.errorText {
-                            Label(err, systemImage: "exclamationmark.triangle.fill")
-                                .font(.callout).foregroundStyle(Look.alert)
-                        }
-                        if model.cards.isEmpty && model.lastSpeech.isEmpty && model.errorText == nil { emptyState }
-                        ForEach(model.cards, id: \.cardID) { CardView(card: $0, locale: locale) }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    if !model.lastQuestion.isEmpty { question }
+                    if !model.lastSpeech.isEmpty { spokenLine }
+                    if let err = model.errorText {
+                        Label(err, systemImage: "exclamationmark.triangle.fill")
+                            .font(.callout).foregroundStyle(Look.alert)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
-                    .padding(.bottom, 24)
-                }
-                .background(Look.aisle.ignoresSafeArea())
-                .safeAreaInset(edge: .top, spacing: 0) {
+                    if model.cards.isEmpty && model.lastSpeech.isEmpty && model.errorText == nil { emptyState }
+                    ForEach(model.cards, id: \.cardID) { CardView(card: $0, locale: locale) }
                     if showDebug {
                         DebugOverlay(state: model.deviceState, glassesBackend: model.glassesBackend, debug: model.debug)
-                            .padding(.horizontal, 16)
-                            .padding(.bottom, 6)
-                            .background(Look.aisle)
+                            .padding(.top, 8)
                     }
                 }
-                .safeAreaInset(edge: .bottom, spacing: 0) { dock }
-                .animation(.snappy(duration: 0.3), value: model.proposal?.proposalID)
-                .navigationTitle("Spendtacles")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbarBackground(Look.aisle, for: .navigationBar)
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Menu {
-                            Button("Connect glasses") { Task { await model.connectGlasses() } }.accessibilityIdentifier("connectGlasses")
-                            Button("Use phone only") { Task { await model.useGlasses(false) } }
-                            Toggle("Discreet mode (no amounts spoken)", isOn: $model.discreetMode)
-                            Toggle("Debug overlay", isOn: $showDebug)
-                        } label: { Image(systemName: "ellipsis.circle") }.accessibilityIdentifier("menu")
-                    }
-                }
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
+                .padding(.bottom, 24)
             }
+            .scrollDismissesKeyboard(.interactively)
+            .background(Look.aisle.ignoresSafeArea())
+            .safeAreaInset(edge: .top, spacing: 0) { header }
+            .safeAreaInset(edge: .bottom, spacing: 0) { dock }
+            .animation(.snappy(duration: 0.3), value: model.proposal?.proposalID)
             .tint(Look.ink)
             .task { if !model.started { await model.start() } }
         }
+    }
+
+    private var header: some View {
+        HStack(spacing: 10) {
+            Text("Spendtacles")
+                .font(.system(size: 28, weight: .heavy).width(.compressed))
+                .foregroundStyle(Look.ink)
+                .accessibilityAddTraits(.isHeader)
+            Spacer(minLength: 8)
+            Button { if !onGlasses { Task { await model.connectGlasses() } } } label: {
+                GlassesStatus(mode: model.deviceState?.mode, backend: model.glassesBackend)
+            }
+            .accessibilityHint(onGlasses ? "" : "Connects your glasses")
+            Menu {
+                Button("Connect glasses") { Task { await model.connectGlasses() } }.accessibilityIdentifier("connectGlasses")
+                Button("Use phone only") { Task { await model.useGlasses(false) } }
+                Toggle("Discreet mode (no amounts spoken)", isOn: $model.discreetMode)
+                Toggle("Debug overlay", isOn: $showDebug)
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(Look.ink)
+                    .frame(width: 32, height: 32)
+                    .background(Look.shelf, in: Circle())
+                    .overlay(Circle().strokeBorder(Look.line, lineWidth: 1))
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityLabel("More")
+            .accessibilityIdentifier("menu")
+        }
+        .padding(.leading, 20)
+        .padding(.trailing, 10)
+        .padding(.vertical, 6)
+        .background(Look.aisle)
+    }
+
+    /// The user's own words, right-aligned like a sent message.
+    private var question: some View {
+        Text(model.lastQuestion)
+            .font(.body)
+            .foregroundStyle(Look.onInk)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(Look.ink, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .frame(maxWidth: .infinity, alignment: .trailing)
+            .padding(.leading, 48)
+            .accessibilityLabel("You asked: \(model.lastQuestion)")
     }
 
     private var spokenLine: some View {
@@ -448,14 +503,26 @@ public struct CompanionScreen: View {
     }
 
     private var emptyState: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Image(systemName: "eyeglasses").font(.system(size: 28, weight: .semibold)).foregroundStyle(Look.ink)
-                .accessibilityHidden(true)
-            Text("Look at a price and ask “Can I afford this?”").font(.title3.weight(.semibold)).foregroundStyle(Look.ink)
-            Text("Or ask what's safe to spend this week. Hold the mic button, or type below.")
-                .font(.subheadline).foregroundStyle(Look.slate)
+        VStack(alignment: .leading, spacing: 10) {
+            Text(onGlasses ? "Look at a price and ask “Can I afford this?”" : "Ask before you buy.")
+                .font(.system(size: 34, weight: .heavy).width(.compressed))
+                .foregroundStyle(Look.ink)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(onGlasses
+                 ? "Your glasses read the label. You hear what buying it would leave you until Sunday."
+                 : "Say a price, or connect your glasses to read the label for you.")
+                .font(.body).foregroundStyle(Look.slate)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.top, 48)
+        .padding(.top, 40)
+    }
+
+    /// Questions the coach answers today, as one-tap starters.
+    private var suggestions: [String] {
+        let fi = locale.hasPrefix("fi")
+        let afford = onGlasses ? (fi ? "Onko minulla varaa tähän?" : "Can I afford this?")
+                               : (fi ? "Onko minulla varaa 25 euroon?" : "Can I afford 25 euros?")
+        return [afford, fi ? "Paljonko voin käyttää tällä viikolla?" : "What's safe to spend this week?"]
     }
 
     /// The decision, when one is waiting, sits directly above the input bar.
@@ -484,34 +551,53 @@ public struct CompanionScreen: View {
                     Text("Working on it…")
                 }
                 .font(.callout).foregroundStyle(Look.slate)
+            } else if model.proposal == nil && !typing {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(suggestions, id: \.self) { s in
+                            Button(s) { Task { await model.ask(typed: s) } }
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(Look.ink)
+                                .padding(.horizontal, 14)
+                                .frame(height: 36)
+                                .background(Look.shelf, in: Capsule())
+                                .overlay(Capsule().strokeBorder(Look.line, lineWidth: 1))
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                }
+                .padding(.horizontal, -16)
             }
             HStack(spacing: 10) {
-                TextField("Ask about your money", text: $typed)
+                TextField("Type a question", text: $typed)
+                    .focused($typing)
+                    .submitLabel(.send)
                     .padding(.horizontal, 16)
                     .frame(height: 48)
                     .background(Look.shelf, in: Capsule())
                     .overlay(Capsule().strokeBorder(Look.line, lineWidth: 1))
                     .accessibilityIdentifier("askField")
                     .onSubmit { let t = typed; typed = ""; Task { await model.ask(typed: t) } }
-                Button { model.pushToTalk() } label: {
-                    Image(systemName: model.listening ? "waveform" : "mic.fill")
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(Look.onInk)
-                        .frame(width: 48, height: 48)
-                        .background(Look.ink, in: Circle())
+                if model.listening || model.busy {
+                    Button { Task { await model.stop() } } label: {
+                        Image(systemName: "stop.fill")
+                            .font(.title3)
+                            .foregroundStyle(Look.ink)
+                            .frame(width: 56, height: 56)
+                            .background(Look.shelf, in: Circle())
+                            .overlay(Circle().strokeBorder(Look.ink, lineWidth: 2))
+                    }
+                    .accessibilityLabel("Stop")
+                } else {
+                    Button { typing = false; model.pushToTalk() } label: {
+                        Image(systemName: "mic.fill")
+                            .font(.title2.weight(.semibold))
+                            .foregroundStyle(Look.onInk)
+                            .frame(width: 56, height: 56)
+                            .background(Look.ink, in: Circle())
+                    }
+                    .accessibilityLabel("Ask out loud")
                 }
-                .disabled(model.busy)
-                .opacity(model.busy ? 0.5 : 1)
-                .accessibilityLabel("Hold to ask")
-                Button { Task { await model.stop() } } label: {
-                    Image(systemName: "stop.fill")
-                        .font(.subheadline)
-                        .foregroundStyle(Look.ink)
-                        .frame(width: 44, height: 44)
-                        .background(Look.shelf, in: Circle())
-                        .overlay(Circle().strokeBorder(Look.line, lineWidth: 1))
-                }
-                .accessibilityLabel("Stop")
             }
         }
         .padding(.horizontal, 16)
