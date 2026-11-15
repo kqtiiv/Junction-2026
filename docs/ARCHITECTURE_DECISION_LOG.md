@@ -40,6 +40,10 @@ The canonical record of every material decision on the glasses platform and its 
 | [DEC-026](#dec-026--s-bank-is-dropped-from-the-project-the-finance-capability-becomes-the-teams-money-coach) | S-Bank is dropped from the project; the finance capability becomes the team's money coach | accepted | platform |
 | [DEC-027](#dec-027--the-phone-app-has-one-bold-element-the-answers-figure-on-a-price-tag-and-the-decision-docks-above-the-input-bar) | The phone app has one bold element (the answer's figure on a price tag), and the decision docks above the input bar | accepted | companion |
 | [DEC-028](#dec-028--an-answer-about-a-price-label-is-about-that-item-the-phone-offers-starters-only-before-the-first-question) | An answer about a price label is about that item; the phone offers starters only before the first question | accepted | finance |
+| [DEC-029](#dec-029--every-answer-card-carries-a-purchase-receipt-the-platform-signs-it-after-the-verifier-passes-and-anyone-can-re-check-it) | Every answer card carries a Purchase Receipt; the platform signs it after the verifier passes, and anyone can re-check it | accepted | platform |
+| [DEC-030](#dec-030--a-deterministic-trust-gate-asks-or-abstains-instead-of-guessing) | A deterministic trust gate asks or abstains instead of guessing | accepted | finance |
+| [DEC-031](#dec-031--buy-now--wait--skip-from-the-same-engine-results-decisions-are-remembered-per-user-and-deletable) | Buy now / wait / skip from the same engine results; decisions are remembered per user and deletable | accepted | finance |
+| [DEC-032](#dec-032--a-scenario-evaluation-harness-reports-false-safe-answers-abstention-and-verification) | A scenario evaluation harness reports false-safe answers, abstention and verification | accepted | platform |
 
 ---
 
@@ -1594,3 +1598,200 @@ The canonical record of every material decision on the glasses platform and its 
 
 ### Revisit triggers
 - Revisit this decision if a real label reader returns product names users don't recognise, or if the speech pipeline gets a safe way to say item names.
+
+## DEC-029 — Every answer card carries a Purchase Receipt; the platform signs it after the verifier passes, and anyone can re-check it
+
+- Status: accepted
+- Date: 2026-11-15
+- Owner: platform + money coach
+- Scope: platform
+- Decision:
+  - `InsightCard` gets an optional `receipt` (additive within v1): `lines` (key, label, money or text, epistemic, source: camera / user / engine / coach / platform / fixture, ref, note), `confidence` (state confident / caveated / abstained, with reasons and whether each blocks the verdict), `freshness` (as_of, source, simulated) and `verification`.
+  - The capability writes lines, confidence and freshness. The grounding verifier now checks every money value on the receipt and every decimal in its calculation line, as well as the card's own values. Only then does the platform write `verification`: status, figures checked, calc_ids, a digest of the card (canonical JSON, minus the signature) and an ES256 JWS over `{card_id, digest, calc_ids, status, signed_at}`. Cards returned by a confirmation go through the same check and signing.
+  - `POST /v1/receipts/verify` re-checks a receipt a client sends back: signature, digest, and every figure against this user's calculation log (observed prices against the user's stored observations). `GET /v1/receipts/public-key` publishes the key.
+  - The phone keeps each card's JSON exactly as received and sends that back, because re-encoding through Codable could change dates and break the digest.
+
+### Context
+- **Problem being solved:** answers were checked internally, but the user (or a judge) couldn't see why an answer was given, how sure it was, or prove it hadn't changed.
+- **Requirements and constraints:** no breaking contract change; nothing on a receipt may be unverified; no secrets on the phone.
+- **Assumptions:** [assumption] one signing key per deployment (`PLATFORM_SIGNING_KEY_PEM`); without it the dev key is ephemeral and receipts can't be checked after a restart.
+- **Non-goals:** a hash-chained audit log (DEC-013 stays proposed); offline verification on the phone.
+
+### Options considered
+| Option | Advantages | Disadvantages | Why accepted or rejected |
+|---|---|---|---|
+| Receipt in the card, verified then signed by the platform, re-checkable by endpoint | One object to show and to prove; capability can't sign its own work | Card JSON must be sent back byte-faithful | **Accepted** |
+| Separate receipt endpoint per calc_id | Smaller cards | Two round trips on the phone; harder to keep in sync | Rejected |
+| Capability signs its receipts | Simpler | The component being checked would vouch for itself | Rejected (segregation of duties, S28) |
+
+### Evidence and sources
+| Source | Type | Specific finding used | Why this source is trustworthy | Accessed |
+|---|---|---|---|---|
+| S25 Pip `trust-receipt.ts` (https://github.com/MayberryDT/Pip) | Peer project | [fact] A trust receipt with as-of, freshness and known limits on every answer | Read in the repo (MIT) | 2026-11-15 |
+| S27 Sentinel-MCP, S28 MakerChecker audit spec | Peer projects | [fact] Signed records with an independent verifier; canonical JSON digests | Read in the repos | 2026-11-15 |
+| S20 RFC 8785 / `crypto.ts` | Standard / project code | [fact] Canonical JSON and ES256 JWS already used for confirmations | Our own tested code | 2026-11-15 |
+
+### Implementation
+- **Components affected:** `contracts/schemas/v1/insight_card.schema.json` (+ examples), regenerated types; `backend/src/sdk/verifier.ts` (`cardFigures`), `backend/src/server.ts` (signing, verify, public key), `backend/src/capabilities/sbank-coach/adapter.ts` (`verifyCard`, composite resolver), `fast-path.ts` (receipts); iOS `CompanionCoordinator` (raw cards), `OrchestratorClient.verifyReceipt`, `Views.swift` (`ReceiptSheet`).
+- **Contracts or schemas affected:** additive: `InsightCard.receipt`; optional `verifyCard` on the adapter interface.
+- **Configuration / feature flags:** none.
+- **Tests or demo checks required:** `backend/test/trust.test.ts` (full receipt, verify, tamper, forged signature, unsigned, other user); eval scenarios `receipt-intact`, `receipt-modified`; the iOS UI test opens the receipt and re-checks it.
+- **Migration or rollback plan:** clients ignore `receipt` if absent; revert the commits.
+
+### Consequences
+- **Benefits:** every answer shows its evidence and can be proven unmodified and grounded.
+- **Costs and limitations:** cards are larger; re-verification needs the calculation log, which is in memory (lost on restart).
+- **Failure behavior:** a card that fails grounding is dropped before signing, as before.
+- **Security/privacy implications:** the verify endpoint is user-scoped: another user's receipt doesn't verify against your log.
+- **What this intentionally does not solve:** long-term, tamper-evident storage of receipts.
+
+### Revisit triggers
+- Revisit this decision when receipts must survive a restart (persist the log), or when receipts are shared outside the user's own session.
+
+## DEC-030 — A deterministic trust gate asks or abstains instead of guessing
+
+- Status: accepted
+- Date: 2026-11-15
+- Owner: money coach
+- Scope: finance
+- Decision:
+  - **Prices:** a camera reading is used only if there is exactly one price, the reader is at least 80 % sure and no issue is flagged. Otherwise the coach asks: "Is it 19.90 or 79.90?" (ambiguous), "Is it 79.90?" (low confidence), or "Can you tell me the price?" (unreadable). It offers the candidates as reply chips. The confirmed price is labelled as the user's, and a different answer counts as a correction.
+  - **Account data:** no verdict and no proposal when data is missing, more than 7 days old, in pace mode (no balance), when an upcoming bill is unknown (`COMMITMENT_UNKNOWN`), or when sources conflict (`SOURCE_CONFLICT`). The coach says why in words, with no figures, and the card shows what is known with "Verdict: Not given".
+  - **Caveats** (answer given, reasons on the receipt): an estimated bill, data more than 24 hours old, a simulated date, the user's own weekly amount, low history coverage, engine warnings. Budget mode without a balance is a caveat, not a block (the user's own amount).
+  - The gate is code, not a model. It only reads the engine's and the label reader's outputs.
+  - Synthetic fixture scenarios (`FIXTURE_SCENARIO`) and scripted label readings (`LABEL_FIXTURE_SEQUENCE`) exercise every rule.
+
+### Context
+- **Problem being solved:** a confident "it fits" on a misread price or on incomplete data is the worst failure a money coach can have. A false-safe answer is worse than no answer.
+- **Requirements and constraints:** never turn missing information into certainty; no LLM overrides; abstentions must still be useful (say what is known and what is missing).
+- **Assumptions:** [assumption] the thresholds (80 % OCR confidence, 24 hours, 7 days) are starting values; tune them with real data. [mock] the label reader is a fixture.
+- **Non-goals:** detecting conflicts inside the engine; a real OCR model.
+
+### Options considered
+| Option | Advantages | Disadvantages | Why accepted or rejected |
+|---|---|---|---|
+| Deterministic gate over engine and reader outputs | Testable, explainable, can't be talked out of it | Thresholds are fixed by hand | **Accepted** |
+| Answer with a lower confidence label | Always gives an answer | Still invites the user to act on a guess | Rejected |
+| Let a model decide when to abstain | Flexible | Not testable to zero false-safe; model could talk itself into certainty | Rejected (DEC-019) |
+
+### Evidence and sources
+| Source | Type | Specific finding used | Why this source is trustworthy | Accessed |
+|---|---|---|---|---|
+| S26 Focal `verifier.py` | Peer project | [fact] Verdicts verified / caution / rejected with a reason for every dropped input | Read in the repo | 2026-11-15 |
+| S25 Pip `spendable-cash-today.ts` | Peer project | [fact] Confidence from data coverage, not from a model | Read in the repo (MIT) | 2026-11-15 |
+| S30 Marvis `visionService.ts` | Peer project | [fact] An invented product at 0.85 confidence when no keys are set: the failure this gate prevents | Read in the repo | 2026-11-15 |
+| `docs/finance/REFERENCE_DESIGN.md` §6.6 | Project design | [fact] No yes/no affordability in pace mode | Our own design | 2026-11-15 |
+
+### Implementation
+- **Components affected:** `backend/src/capabilities/sbank-coach/trust.ts` (new), `fast-path.ts` (gate, price checks, abstain), `fixture-engine.ts` (scenarios), `finance-engine.ts` (UNKNOWN in pace mode), `platform/label-reader.ts` (fixtures), `main.ts` (env).
+- **Contracts or schemas affected:** finance missing-data codes `COMMITMENT_UNKNOWN`, `SOURCE_CONFLICT` (additive).
+- **Configuration / feature flags:** `FIXTURE_SCENARIO`, `LABEL_FIXTURE_SEQUENCE` (demo and evaluation only; defaults unchanged).
+- **Tests or demo checks required:** `trust.test.ts`; eval critical scenarios; mutation check (disabling the gate must fail the eval).
+- **Migration or rollback plan:** revert; defaults behave as before for clear labels and complete data.
+
+### Consequences
+- **Benefits:** zero false-safe answers on the critical scenarios; abstentions say why and what is known.
+- **Costs and limitations:** more questions when labels are poor; thresholds untested on real OCR.
+- **Failure behavior:** when unsure, ask; when the data can't support it, abstain. Never the other way round.
+- **Security/privacy implications:** label text stays untrusted, sanitised and is never spoken.
+- **What this intentionally does not solve:** real OCR accuracy.
+
+### Revisit triggers
+- Revisit this decision when a real label reader exists (measure and tune the 80 % threshold), or when the engine reports its own conflicts and staleness.
+
+## DEC-031 — Buy now / wait / skip from the same engine results; decisions are remembered per user and deletable
+
+- Status: accepted
+- Date: 2026-11-15
+- Owner: money coach + companion UI
+- Scope: finance
+- Decision:
+  - Each verdict comes with an options card: **Buy now** (what's left after buying, from the engine), **Wait** ("No change today", and when the week or pay cycle starts over, as a fact), **Skip** (what stays available, from the engine). No option is recommended, and nothing claims that waiting improves anything.
+  - "I'll wait" and "skip it" (also as buttons and chips) are remembered with the item, price, date and the calculation they were made on, and withdraw the plan-it-in offer. Confirming a plan is remembered as "planned".
+  - "What have I decided" shows a decisions card: kept unspent for now (a sum logged as the coach's own calculation, so the verifier traces it), purchases reconsidered, prices checked, prices corrected, times the coach didn't guess. It says this is session data and that keeping money unspent isn't saving it.
+  - Memory is per user, in memory, capped at 50 decisions, and deleted by "forget my decisions" (voice, chip or menu). Nothing is remembered that the user didn't ask about.
+
+### Context
+- **Problem being solved:** an affordability answer alone doesn't show what the decision means, and nothing showed whether the coach helped.
+- **Requirements and constraints:** all figures deterministic and verified; no guilt or judgement; no always-on capture; memory transparent and deletable.
+- **Assumptions:** [assumption] session-level memory is enough for the demo; real persistence needs a retention policy and consent wording.
+- **Non-goals:** savings goals with real transfers; comparing planned with actual purchases (needs receipt matching).
+
+### Options considered
+| Option | Advantages | Disadvantages | Why accepted or rejected |
+|---|---|---|---|
+| Options from existing engine outputs; in-memory, deletable decision log | Nothing new to verify; honest | Lost on restart | **Accepted** |
+| Projected savings ("you'd save €X by June") | Motivating | A prediction the engine doesn't make | Rejected |
+| Persistent history in a database | Survives restarts | Retention, deletion and consent work before the demo | Later |
+
+### Evidence and sources
+| Source | Type | Specific finding used | Why this source is trustworthy | Accessed |
+|---|---|---|---|---|
+| S29 Mira event spine | Peer project | [fact] Each event stores its receipt text, decision and evidence | Read in the repo | 2026-11-15 |
+| S25 Pip `simulate_purchase`, delete-data route | Peer project | [fact] Before, after and shortfall of a purchase; explicit data deletion | Read in the repo (MIT) | 2026-11-15 |
+
+### Implementation
+- **Components affected:** `backend/src/capabilities/sbank-coach/decisions.ts` (new), `fast-path.ts` (options card, intents, memory, decisions card), `adapter.ts` (resolver includes coach calculations); iOS proposal panel (Plan it in / I'll wait / Skip it), option tiles, chips, menu, consent row.
+- **Contracts or schemas affected:** finance tool `finance.summarize_decisions` (additive); `DomainResponse.followups` now used.
+- **Configuration / feature flags:** none.
+- **Tests or demo checks required:** `trust.test.ts` (wait, skip, history, forget, planned); eval `user-waits`.
+- **Migration or rollback plan:** revert.
+
+### Consequences
+- **Benefits:** the user sees the consequences of each choice and can act on one in a tap or a word.
+- **Costs and limitations:** memory is lost on restart; counts are per session.
+- **Failure behavior:** "I'll wait" with nothing asked about asks for context.
+- **Security/privacy implications:** item names are untrusted label text, sanitised, displayed only.
+- **What this intentionally does not solve:** long-term impact measurement.
+
+### Revisit triggers
+- Revisit this decision when memory must persist, or when real outcomes (receipts) can be matched to decisions.
+
+## DEC-032 — A scenario evaluation harness reports false-safe answers, abstention and verification
+
+- Status: accepted
+- Date: 2026-11-15
+- Owner: platform
+- Scope: platform
+- Decision:
+  - `cd backend && npm run eval` runs every scenario in `backend/eval/scenarios.ts` through the real orchestrator and capability in process, verifies every receipt produced, and writes `docs/eval/RESULTS.md` and `results.json`. `-- --check` exits non-zero on any false-safe answer or failed critical scenario.
+  - Metrics: false-safe answers (said it fits or offered to plan it when it shouldn't), critical and overall pass rate, appropriate abstention rate, missed and unnecessary abstentions, incorrect confidence rate, receipts verified, tamper checks, in-process latency.
+  - Not measured, and reported as such: OCR accuracy (no OCR model) and user correction rate (needs real users).
+  - A step is scored on what the user got (a verdict, a question, nothing), not on what the receipt says about itself. A false-safe step always fails.
+
+### Context
+- **Problem being solved:** "trustworthy" needs evidence that can be rerun, including evidence that the checks would catch a regression.
+- **Requirements and constraints:** synthetic data only, clearly labelled; honest reporting; easy to add scenarios.
+- **Assumptions:** [mock] fixture data and scripted label readings.
+- **Non-goals:** user studies; real-world impact claims.
+
+### Options considered
+| Option | Advantages | Disadvantages | Why accepted or rejected |
+|---|---|---|---|
+| Data-driven scenarios run through the real HTTP API in process | Tests the whole path, fast, deterministic | Not real devices or OCR | **Accepted** |
+| Unit tests only | Already exist | No aggregate metrics, no report | Kept alongside |
+| LLM-judged evaluation | Flexible | Not deterministic; no model in the answer path | Rejected |
+
+### Evidence and sources
+| Source | Type | Specific finding used | Why this source is trustworthy | Accessed |
+|---|---|---|---|---|
+| S25 Pip `scripts/eval-agent.mjs` | Peer project | [fact] Scenario cases with expected and forbidden outcomes | Read in the repo (MIT) | 2026-11-15 |
+| S27 Sentinel-MCP security vectors and release gate | Peer project | [fact] Fixtures with expected reason codes; a JSON release report | Read in the repo | 2026-11-15 |
+| Mutation check, 2026-11-15 | Our own run | [fact] Disabling the data gate: 15/19, 3 false-safe; disabling the label check: 17/19, 2 false-safe. Restored: 19/19, 0 false-safe | Reproducible with the commands in the commit message | 2026-11-15 |
+
+### Implementation
+- **Components affected:** `backend/eval/scenarios.ts`, `backend/eval/run.ts`, `backend/package.json` (`eval`), `docs/eval/`.
+- **Contracts or schemas affected:** none.
+- **Configuration / feature flags:** none.
+- **Tests or demo checks required:** `npm run eval -- --check` before a demo.
+- **Migration or rollback plan:** remove the folder.
+
+### Consequences
+- **Benefits:** a single command shows the safety numbers judges ask about, and the report says what is not measured.
+- **Costs and limitations:** synthetic scenarios can't show real-world accuracy.
+- **Failure behavior:** a regression shows up as a false-safe count above zero.
+- **Security/privacy implications:** none; no real data.
+- **What this intentionally does not solve:** real OCR and user evaluation.
+
+### Revisit triggers
+- Revisit this decision when a real label reader or user study exists (add labelled images and real correction rates).

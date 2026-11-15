@@ -12,7 +12,8 @@
     "start": "tsx src/main.ts",
     "test": "node --import tsx --test --test-reporter=spec test/*.test.ts",
     "typecheck": "tsc --noEmit",
-    "eval": "tsx eval/run.ts"
+    "eval": "tsx eval/run.ts",
+    "demo": "tsx eval/demo.ts"
   },
   "dependencies": {
     "@fastify/multipart": "^10.1.8",

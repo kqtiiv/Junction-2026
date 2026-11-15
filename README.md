@@ -29,6 +29,16 @@ These screenshots come from CI, not a mock-up. The UI test runs the real iOS app
 
 The dark strip under the title (`glasses: mock · mode: glasses · seq …`) is the debug overlay. It is there on purpose: **mocks are never silent** (DEC-005), so the app always shows when simulated glasses or fixture data are in play.
 
+## Show me why
+
+Spendtacles doesn't just say whether you can afford something. It shows what the decision means for your money and proves how it got there.
+
+- **The Purchase Receipt.** Every answer links to a receipt, set like a till receipt: the product and price read by the camera (and how sure it was), the money available, the bills taken off first, the calculation itself (`90.16 − 79.90 = 10.26`), what's left, the verdict rule, and how fresh the data is. Every line says where it came from: camera, you, the money engine or the coach (DEC-029).
+- **Signed, and checkable by anyone.** The platform signs each receipt only after every figure on it has been matched to the money engine's calculation log. "Check this receipt again" sends the card back to `POST /v1/receipts/verify`, which re-checks the signature, the contents and every figure. Change one number and it fails.
+- **It refuses to guess.** If the label could say 19.90 or 79.90, it asks: *"I can't read that price reliably. Is it 19.90 or 79.90?"* If account data is missing, more than a week old or conflicting, or an upcoming bill is unknown, it gives no verdict and says why (DEC-030).
+- **Buy now, wait or skip.** Each answer shows all three, from the same engine results: what's left if you buy, that nothing changes if you wait, and what stays available if you skip. Say "I'll wait" or "skip it" and it remembers; say "forget my decisions" and it doesn't (DEC-031).
+- **Measured, not asserted.** `npm run eval` runs 19 synthetic scenarios, 15 of them critical. Current result: **0 false-safe answers**, every scenario passed, every receipt verified, tampering detected. Disabling the safety checks makes it fail. See [`docs/eval/RESULTS.md`](docs/eval/RESULTS.md) (DEC-032).
+
 ## Built to be trusted
 
 - **The AI never invents numbers.** Every figure comes from a deterministic finance engine and carries a calculation ID. A verifier checks each spoken number and card value against the engine's log before it is sent, and drops any number the engine didn't calculate (covered by tests).
@@ -124,19 +134,21 @@ Fixed demo numbers (€90.16 safe to spend this week), reported as `mock` everyw
 | | |
 |---|---|
 | **Real** | Orchestrator, consent, capture pipeline, confirmation signing, number verification, contracts, iOS companion core, the DAT SDK integration (built and driven in CI with Mock Device Kit), and the team's money engine on transaction data (`s_pankki`, on a simulated date) |
-| **Mocked** (labelled `mock` in `/health` and on screen) | The `fixture` finance source, the label reader (always returns the demo €79.90 label), and the coach agent (client designed and tested against a fake agent, not yet connected) |
+| **Mocked** (labelled `mock` in `/health` and on screen) | The `fixture` finance source and its synthetic scenarios (`FIXTURE_SCENARIO`), the label reader (scripted readings: the €79.90 headphones label by default, or a sequence such as `LABEL_FIXTURE_SEQUENCE=clear,ambiguous`), and the coach agent (client designed and tested against a fake agent, not yet connected) |
 | **Behind flags** | "Hey Meta" voice launch and glasses-tap confirmation are experimental in DAT 1.0.1, so each has a fallback (DEC-004, DEC-022) |
 
 ## Repository layout
 
 | Path | What it is |
 |---|---|
-| [`backend/`](backend/README.md) | Platform orchestrator + money-coach adapter. TypeScript, Node 22, Fastify. 63 tests. |
+| [`backend/`](backend/README.md) | Platform orchestrator + money-coach adapter, trust gate, receipts, decision memory. TypeScript, Node 22, Fastify. 83 tests, plus the evaluation harness in `backend/eval/`. |
 | [`companion-ios/`](companion-ios/README.md) | iOS companion: glasses session, Bluetooth audio, speech, capture, cards. Swift, SwiftUI, Meta Wearables DAT 1.0.1. |
 | [`finance-engine/`](finance-engine/README.md) | HTTP service in front of the team's Python money engine: decimal strings, `calc_id`s, calculation lookups. Python, FastAPI. 10 tests. |
 | [`contracts/`](contracts/README.md) | Versioned JSON Schema contracts, valid/invalid examples as tests, generated TS/Swift/Kotlin/Python types, OpenAPI specs, the adapter interface |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Platform architecture |
-| [`docs/ARCHITECTURE_DECISION_LOG.md`](docs/ARCHITECTURE_DECISION_LOG.md) | 26 decisions (DEC-001 to DEC-026), each with alternatives, evidence and revisit triggers |
+| [`docs/ARCHITECTURE_DECISION_LOG.md`](docs/ARCHITECTURE_DECISION_LOG.md) | 32 decisions (DEC-001 to DEC-032), each with alternatives, evidence and revisit triggers |
+| [`docs/eval/RESULTS.md`](docs/eval/RESULTS.md) | Evaluation results: false-safe answers, abstention, receipt verification, latency |
+| [`docs/demo/DEMO_SCRIPT.md`](docs/demo/DEMO_SCRIPT.md) | The judge demo, with exact lines and fallbacks |
 | [`docs/SOURCES.md`](docs/SOURCES.md), [`docs/adr/evidence/`](docs/adr/README.md) | Source register and research write-ups |
 | [`docs/finance/REFERENCE_DESIGN.md`](docs/finance/REFERENCE_DESIGN.md) | Finance-domain reference design |
 
@@ -153,6 +165,12 @@ cd backend && npm install && npm test && npm run dev    # http://localhost:8787
 FINANCE_SOURCE=user_stated npm run dev                  # no bank data: the coach asks for a weekly amount
 FINANCE_SOURCE=s_pankki npm run dev                     # the team's engine (start finance-engine/ first; FINANCE_ENGINE_URL, default :8790)
 curl -H 'authorization: Bearer demo-token' localhost:8787/health
+LABEL_FIXTURE_SEQUENCE=clear,ambiguous npm run dev      # the demo: headphones, then a smudged label (docs/demo/DEMO_SCRIPT.md)
+FIXTURE_SCENARIO=unknown_bill npm run dev               # see the coach abstain (also: stale, conflict, missing, insufficient, pace)
+
+# Evaluation and a device-free demo
+npm run eval -- --check                                 # writes docs/eval/RESULTS.md; fails on any false-safe answer
+npm run demo                                            # the demo conversation in the terminal, plus a receipt check and a tamper check
 
 # iOS companion core (macOS or Linux): unit tests, then the end-to-end smoke test against the running backend
 cd companion-ios && swift test
@@ -163,4 +181,4 @@ The app itself needs Xcode. No Mac? The [`iOS companion`](.github/workflows/ios.
 
 ## What's next
 
-Real bank data through a PSD2 sandbox, a real label reader, receipt matching, connecting the coach agent, then more capabilities on the same platform.
+Real bank data through a PSD2 sandbox; a real label reader, measured against labelled photos with the 80 % threshold tuned; persisting receipts and decisions with a retention policy; matching shop receipts to decisions; connecting the coach agent; then more capabilities on the same platform.
