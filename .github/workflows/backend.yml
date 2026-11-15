@@ -1,0 +1,37 @@
+# Contracts, backend tests and the safety evaluation (DEC-032) on every push.
+# The evaluation fails the build on any false-safe answer or failed critical scenario.
+name: Backend + evaluation
+
+on:
+  push:
+    paths: ["backend/**", "contracts/**", ".github/workflows/backend.yml"]
+  workflow_dispatch: {}
+
+concurrency:
+  group: backend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Contracts (validate schemas and examples, regenerate types)
+        working-directory: contracts
+        run: npm ci && npm run check
+      - name: Backend tests
+        working-directory: backend
+        run: npm ci && npm run typecheck && npm test
+      - name: Safety evaluation (fails on any false-safe answer)
+        working-directory: backend
+        run: npm run eval -- --check
+      - name: Upload the evaluation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-results
+          path: docs/eval/
