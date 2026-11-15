@@ -39,6 +39,7 @@ The canonical record of every material decision on the glasses platform and its 
 | [DEC-025](#dec-025--money-answers-follow-the-engine-safe-to-spend-today-until-payday-not-per-week) | Money answers follow the engine: safe to spend today, until payday, not per week | accepted | finance |
 | [DEC-026](#dec-026--s-bank-is-dropped-from-the-project-the-finance-capability-becomes-the-teams-money-coach) | S-Bank is dropped from the project; the finance capability becomes the team's money coach | accepted | platform |
 | [DEC-027](#dec-027--the-phone-app-has-one-bold-element-the-answers-figure-on-a-price-tag-and-the-decision-docks-above-the-input-bar) | The phone app has one bold element (the answer's figure on a price tag), and the decision docks above the input bar | accepted | companion |
+| [DEC-028](#dec-028--an-answer-about-a-price-label-is-about-that-item-the-phone-offers-starters-only-before-the-first-question) | An answer about a price label is about that item; the phone offers starters only before the first question | accepted | finance |
 
 ---
 
@@ -1545,3 +1546,51 @@ The canonical record of every material decision on the glasses platform and its 
 
 ### Revisit triggers
 - Revisit this decision if the contract gains a verdict or breakdown field (a capability-aware visual becomes possible), if the demo uses a Ray-Ban Display (build the display renderer), or if testers misread the yellow tag as a price instead of what's left.
+
+## DEC-028 — An answer about a price label is about that item; the phone offers starters only before the first question
+
+- Status: accepted
+- Date: 2026-11-15
+- Owner: money coach + companion UI
+- Scope: finance
+- Decision:
+  - When the price came from a label the user looked at, the answer card's title is the item, e.g. "Langattomat kuulokkeet", in both the weekly and until-payday answers. The label text goes through the existing `safeLabel` (control characters stripped, 40 characters max, shelf capitals in sentence case) and is shown, never spoken. Without a label, the titles stay "Does it fit this week?" / "Can you afford it?".
+  - The phone's suggested questions show only before the first question. After that, the screen is about what the user asked.
+  - Not adopted: ambient, always-on capture that detects when the user needs help (the pattern behind the reference projects). It conflicts with user-initiated capture (DEC-006) and the consent promise.
+
+### Context
+- **Problem being solved:** the answer looked like a generic budget card ("Does it fit this week?") although the user had just looked at a specific item, and generic starter questions stayed on screen after an answer.
+- **Requirements and constraints:** no contract change; untrusted label text is never spoken; the UI test still proves the answer card appears and is replaced after confirming.
+- **Assumptions:** [mock] the label reader always returns the demo label, so the demo title is always "Langattomat kuulokkeet".
+- **Non-goals:** speaking the item's name (untrusted OCR text in speech), proactive suggestions.
+
+### Options considered
+| Option | Advantages | Disadvantages | Why accepted or rejected |
+|---|---|---|---|
+| Title the card with the item; starters only on an empty screen | The answer is visibly about the purchase in front of the user; no contract change | The title is untrusted OCR text (sanitised, display only) | **Accepted** |
+| Say the item's name in the spoken answer | More personal in the ear | Untrusted text in speech; mixed languages ("Langattomat kuulokkeet fits…") | Rejected |
+| Ambient capture that offers help unprompted | Proactive | Always-on camera; breaks DEC-006 and the consent screen's promise | Rejected |
+
+### Evidence and sources
+| Source | Type | Specific finding used | Why this source is trustworthy | Accessed |
+|---|---|---|---|---|
+| User reference: MIT Reality Hack 2026 winner (https://github.com/Dongckim/2026-MIT-RealityHack) | Peer project (README read) | [fact] Passive POV image analysis with "friction detection" and ambient advice. [inference] The lesson to take is contextual help, not the passive capture | Public repo README | 2026-11-15 |
+| User reference: "Marvis" hackathon write-up (pasted by the user) | Peer project write-up | [fact] "Showing only the right information at the right time"; the companion app mirrors the glasses | The team's own account | 2026-11-15 |
+| `safeLabel` in `fast-path.ts` | Project code | [fact] Label text is already sanitised and never spoken | Our code and tests | 2026-11-15 |
+
+### Implementation
+- **Components affected:** `backend/src/capabilities/sbank-coach/fast-path.ts` (`itemTitle`), `backend/test/s-pankki.test.ts`, `companion-ios/Sources/CompanionUI/Views.swift` (starters), `companion-ios/UITests/CompanionUITests.swift` (asserts on the item title).
+- **Contracts or schemas affected:** none. The contract examples keep their generic titles and stay valid.
+- **Configuration / feature flags:** none.
+- **Tests or demo checks required:** backend suite (63 pass); iOS UI test.
+- **Migration or rollback plan:** revert the commit.
+
+### Consequences
+- **Benefits:** the answer names the purchase; the screen stops suggesting generic budget questions once the user has asked about something real.
+- **Costs and limitations:** a misread label shows a wrong title (the observed-price row already says "Read by the camera. Tap to correct.").
+- **Failure behavior:** no label → the generic title.
+- **Security/privacy implications:** untrusted text is displayed as plain text only, after `safeLabel`.
+- **What this intentionally does not solve:** proactive or ambient help.
+
+### Revisit triggers
+- Revisit this decision if a real label reader returns product names users don't recognise, or if the speech pipeline gets a safe way to say item names.

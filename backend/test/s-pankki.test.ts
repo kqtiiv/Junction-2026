@@ -93,7 +93,7 @@ test("'Can I afford this?' on a price label: fits, says what's left per day, pro
   assert.ok(final.speech.text.split(/\s+/).length <= 25, "speech budget");
   assert.equal(final.trace.verified, true);
   const card = final.cards[0]!;
-  assert.equal(card.title.en, "Can you afford it?");
+  assert.equal(card.title.en, "Langattomat kuulokkeet", "titled with the item in front of the user (DEC-028)");
   assert.equal((card.primary!.value as { amount: string }).amount, "24.02");
   assert.equal(final.proposals[0]?.kind, "finance.plan.add");
   assert.equal(final.proposals[0]?.summary.spoken.en, "Plan this in before payday? Tap to confirm.");

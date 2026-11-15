@@ -551,7 +551,8 @@ public struct CompanionScreen: View {
                     Text("Working on it…")
                 }
                 .font(.callout).foregroundStyle(Look.slate)
-            } else if model.proposal == nil && !typing {
+            } else if model.proposal == nil && !typing && model.cards.isEmpty && model.lastQuestion.isEmpty {
+            // Starters only before the first question; after that the screen is about the item asked about (DEC-028).
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
                         ForEach(suggestions, id: \.self) { s in

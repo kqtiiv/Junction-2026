@@ -75,6 +75,15 @@ const safeLabel = (s: string | undefined) => {
   return t === t.toUpperCase() && /\p{L}/u.test(t) ? t.charAt(0) + t.slice(1).toLowerCase() : t;
 };
 
+/**
+ * An answer about a price label is titled with the item, so the card is about the purchase in
+ * front of the user, not a generic budget question (DEC-028). Falls back when there is no label.
+ */
+const itemTitle = (source: "stated_amount" | "observation", label: string | undefined, fallback: LText): LText => {
+  const t = source === "observation" ? safeLabel(label) : "";
+  return t ? { en: t, fi: t } : fallback;
+};
+
 type Money = { amount: string; currency: "EUR" };
 
 export class DeterministicFastPath implements AgentBackend {
@@ -339,7 +348,7 @@ export class DeterministicFastPath implements AgentBackend {
       card_id: `card_${result.calc_id}`,
       capability_id: CAPABILITY_ID,
       type: "metric",
-      title: { en: "Does it fit this week?", fi: "Mahtuuko tämä viikolle?" },
+      title: itemTitle(source, label, { en: "Does it fit this week?", fi: "Mahtuuko tämä viikolle?" }),
       primary: { label: { en: "Left until Sunday after buying", fi: "Jäljellä sunnuntaihin oston jälkeen" }, value: r.remaining_after, epistemic: kind },
       rows: [
         source === "observation"
@@ -413,7 +422,7 @@ export class DeterministicFastPath implements AgentBackend {
       card_id: `card_${result.calc_id}`,
       capability_id: CAPABILITY_ID,
       type: "metric",
-      title: { en: "Can you afford it?", fi: "Onko sinulla varaa tähän?" },
+      title: itemTitle(source, label, { en: "Can you afford it?", fi: "Onko sinulla varaa tähän?" }),
       primary: { label: { en: "Per day until payday, after buying", fi: "Päivässä palkkapäivään asti oston jälkeen" }, value: r.safe_per_day_after, epistemic: "estimate" },
       rows: [
         obs

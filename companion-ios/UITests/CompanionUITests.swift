@@ -26,7 +26,7 @@ final class CompanionUITests: XCTestCase {
         let field = app.textFields["askField"]
         field.tap()
         field.typeText("does this fit my week\n")
-        XCTAssertTrue(element(app, containing: "Does it fit this week").waitForExistence(timeout: 45), "answer card")
+        XCTAssertTrue(element(app, containing: "Langattomat kuulokkeet").waitForExistence(timeout: 45), "answer card, titled with the item")
         screenshot(app, "3-answer")
 
         let confirm = app.buttons["confirmProposal"]
@@ -36,7 +36,7 @@ final class CompanionUITests: XCTestCase {
         XCTAssertTrue(element(app, containing: "Done.").waitForExistence(timeout: 20), "plan confirmed")
         // The stale answer card is replaced by the updated week (review fix).
         XCTAssertTrue(element(app, containing: "Safe to spend this week").waitForExistence(timeout: 10), "updated card shown")
-        XCTAssertFalse(element(app, containing: "Does it fit this week").exists, "stale answer card replaced")
+        XCTAssertFalse(element(app, containing: "Langattomat kuulokkeet").exists, "stale answer card replaced")
         screenshot(app, "5-confirmed")
     }
 
