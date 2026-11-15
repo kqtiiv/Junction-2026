@@ -176,13 +176,12 @@ struct PriceTag: View {
 public struct CardView: View {
     let card: InsightCard
     let locale: String
-    /// Re-checks this card's receipt with the backend; nil when the card's original JSON isn't held.
-    var check: (() async -> ReceiptCheck?)? = nil
+    /// Opens this card's receipt (the screen owns the sheet).
+    var openReceipt: (() -> Void)? = nil
     @State private var showBasis = false
-    @State private var showReceipt = false
 
-    public init(card: InsightCard, locale: String, check: (() async -> ReceiptCheck?)? = nil) {
-        self.card = card; self.locale = locale; self.check = check
+    public init(card: InsightCard, locale: String, openReceipt: (() -> Void)? = nil) {
+        self.card = card; self.locale = locale; self.openReceipt = openReceipt
     }
 
     private var abstained: Bool { card.receipt?.confidence.state == .abstained }
@@ -220,7 +219,7 @@ public struct CardView: View {
             if let body = card.body {
                 Text(Display.text(body, locale: locale)).font(.callout).foregroundStyle(Look.ink)
             }
-            if card.receipt != nil {
+            if card.receipt != nil, openReceipt != nil {
                 receiptButton
             } else if !card.assumptions.isEmpty || !card.basis.calcIDS.isEmpty {
                 basis
@@ -229,18 +228,11 @@ public struct CardView: View {
         .padding(18)
         .background(Look.shelf, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).strokeBorder(Look.line, lineWidth: 1))
-        .sheet(isPresented: $showReceipt) {
-            if let r = card.receipt {
-                ReceiptSheet(title: Display.text(card.title, locale: locale), receipt: r, assumptions: card.assumptions, locale: locale, check: check)
-                    .presentationDetents([.large])
-                    .presentationDragIndicator(.visible)
-            }
-        }
     }
 
     /// The way into the evidence: what kind of answer this is, and that it was checked.
     private var receiptButton: some View {
-        Button { showReceipt = true } label: {
+        Button { openReceipt?() } label: {
             HStack(spacing: 8) {
                 Image(systemName: card.receipt?.verification?.status == .verified ? "checkmark.seal.fill" : "doc.text")
                     .foregroundStyle(Look.ink)
@@ -707,6 +699,7 @@ public struct CompanionScreen: View {
     @ObservedObject var model: CompanionViewModel
     @State private var typed = ""
     @State private var showDebug = true
+    @State private var receiptCard: ReceiptItem?
     @FocusState private var typing: Bool
 
     public init(model: CompanionViewModel) { self.model = model }
@@ -729,7 +722,7 @@ public struct CompanionScreen: View {
                     }
                     if model.cards.isEmpty && model.lastSpeech.isEmpty && model.errorText == nil { emptyState }
                     ForEach(model.cards, id: \.cardID) { card in
-                        CardView(card: card, locale: locale, check: checker(card.cardID))
+                        CardView(card: card, locale: locale, openReceipt: { receiptCard = ReceiptItem(card: card) })
                     }
                     if showDebug {
                         DebugOverlay(state: model.deviceState, glassesBackend: model.glassesBackend, debug: model.debug)
@@ -745,6 +738,14 @@ public struct CompanionScreen: View {
             .safeAreaInset(edge: .top, spacing: 0) { header }
             .safeAreaInset(edge: .bottom, spacing: 0) { dock }
             .animation(.snappy(duration: 0.3), value: model.proposal?.proposalID)
+            .sheet(item: $receiptCard) { item in
+                if let r = item.card.receipt {
+                    ReceiptSheet(title: Display.text(item.card.title, locale: locale), receipt: r, assumptions: item.card.assumptions,
+                                 locale: locale, check: checker(item.card.cardID))
+                        .presentationDetents([.large])
+                        .presentationDragIndicator(.visible)
+                }
+            }
             .tint(Look.ink)
             .task { if !model.started { await model.start() } }
         }
@@ -931,5 +932,9 @@ public struct CompanionScreen: View {
         .padding(.bottom, 8)
         .overlay(alignment: .top) { Rectangle().fill(Look.line).frame(height: 1) }
     }
+}
+private struct ReceiptItem: Identifiable {
+    let card: InsightCard
+    var id: String { card.cardID }
 }
 #endif
