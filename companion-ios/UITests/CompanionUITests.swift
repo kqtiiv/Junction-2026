@@ -31,15 +31,28 @@ final class CompanionUITests: XCTestCase {
         XCTAssertTrue(element(app, containing: "Langattomat kuulokkeet").waitForExistence(timeout: 45), "answer card, titled with the item")
         screenshot(app, "3-answer")
 
+        // The Purchase Receipt (DEC-029): open it and have the backend re-check it independently.
+        let receipt = app.buttons["openReceipt"].firstMatch
+        XCTAssertTrue(receipt.waitForExistence(timeout: 10), "receipt link on the answer card")
+        receipt.tap()
+        let check = app.buttons["checkReceipt"]
+        XCTAssertTrue(check.waitForExistence(timeout: 10), "receipt sheet")
+        screenshot(app, "4-receipt")
+        app.swipeUp()
+        check.tap()
+        XCTAssertTrue(element(app, containing: "Verified just now").waitForExistence(timeout: 20), "the receipt verifies against the backend")
+        screenshot(app, "5-receipt-verified")
+        app.buttons["closeReceipt"].tap()
+
         let confirm = app.buttons["confirmProposal"]
-        XCTAssertTrue(confirm.waitForExistence(timeout: 15), "confirm sheet")
-        screenshot(app, "4-confirm-sheet")
+        XCTAssertTrue(confirm.waitForExistence(timeout: 15), "decision panel")
+        screenshot(app, "6-decision")
         confirm.tap()
         XCTAssertTrue(element(app, containing: "Done.").waitForExistence(timeout: 20), "plan confirmed")
         // The stale answer card is replaced by the updated week (review fix).
         XCTAssertTrue(element(app, containing: "Safe to spend this week").waitForExistence(timeout: 10), "updated card shown")
         XCTAssertFalse(element(app, containing: "Langattomat kuulokkeet").exists, "stale answer card replaced")
-        screenshot(app, "5-confirmed")
+        screenshot(app, "7-confirmed")
     }
 
     private func element(_ app: XCUIApplication, containing text: String) -> XCUIElement {

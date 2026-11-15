@@ -336,6 +336,7 @@ struct ReceiptSheet: View {
     let assumptions: [[String: String]]
     let locale: String
     let check: (() async -> ReceiptCheck?)?
+    @Environment(\.dismiss) private var dismiss
     @State private var checking = false
     @State private var result: ReceiptCheck?
     @State private var checkedOnce = false
@@ -344,7 +345,14 @@ struct ReceiptSheet: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("Receipt").font(.caption.weight(.semibold)).foregroundStyle(Look.slate)
+                    HStack {
+                        Text("Receipt").font(.caption.weight(.semibold)).foregroundStyle(Look.slate)
+                        Spacer()
+                        Button("Done") { dismiss() }
+                            .font(.subheadline.weight(.semibold)).foregroundStyle(Look.ink)
+                            .frame(minHeight: 44)
+                            .accessibilityIdentifier("closeReceipt")
+                    }
                     Text(title).font(.title2.weight(.bold)).foregroundStyle(Look.ink)
                     HStack(spacing: 8) {
                         pill(stateLabel, systemImage: stateIcon)
