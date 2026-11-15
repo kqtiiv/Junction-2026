@@ -359,6 +359,7 @@ struct ReceiptSheet: View {
                         if receipt.verification?.status == .verified { pill("Signed", systemImage: "checkmark.seal") }
                         if receipt.freshness.simulated { pill("Synthetic data", systemImage: "flask") }
                     }
+                    if check != nil { checkControl.padding(.top, 6) }
                 }
                 DashedRule()
                 VStack(spacing: 10) {
@@ -464,13 +465,19 @@ struct ReceiptSheet: View {
                 Text("Key: \(v.keyID) · \(v.signedAt.formatted(date: .omitted, time: .standard))")
             }
             .font(.caption2.monospaced()).foregroundStyle(Look.slate)
-            if let check {
+        }
+    }
+
+    /// The proof moment, at the top: the server re-checks signature, contents and every figure.
+    @ViewBuilder private var checkControl: some View {
+        if let check {
+            VStack(alignment: .leading, spacing: 8) {
                 Button {
                     checking = true
                     Task { result = await check(); checkedOnce = true; checking = false }
                 } label: {
                     HStack(spacing: 8) {
-                        if checking { ProgressView().controlSize(.small) }
+                        if checking { ProgressView().controlSize(.small) } else { Image(systemName: "checkmark.shield") }
                         Text(checking ? "Checking…" : "Check this receipt again")
                     }
                 }

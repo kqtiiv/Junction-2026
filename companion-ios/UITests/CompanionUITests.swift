@@ -36,10 +36,10 @@ final class CompanionUITests: XCTestCase {
         XCTAssertTrue(receipt.waitForExistence(timeout: 10), "receipt link on the answer card")
         for _ in 0..<4 where !receipt.isHittable { app.scrollViews.firstMatch.swipeUp() }
         receipt.tap()
-        let check = app.buttons["checkReceipt"]
-        XCTAssertTrue(check.waitForExistence(timeout: 10), "receipt sheet")
+        XCTAssertTrue(app.buttons["closeReceipt"].waitForExistence(timeout: 10), "receipt sheet")
         screenshot(app, "4-receipt")
-        app.swipeUp()
+        let check = app.buttons["checkReceipt"]
+        XCTAssertTrue(check.waitForExistence(timeout: 5), "the check button (the card's original JSON is held)")
         check.tap()
         XCTAssertTrue(element(app, containing: "Verified just now").waitForExistence(timeout: 20), "the receipt verifies against the backend")
         screenshot(app, "5-receipt-verified")
