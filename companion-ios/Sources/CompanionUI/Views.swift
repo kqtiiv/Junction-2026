@@ -203,6 +203,8 @@ public struct CardView: View {
             if let primary = card.primary {
                 PriceTag(value: Display.value(primary.value, locale: locale), label: Display.text(primary.label, locale: locale))
             }
+            // The way into the evidence sits right under the answer, never under the docked decision panel.
+            if card.receipt != nil, openReceipt != nil { receiptButton }
             let rows = card.rows ?? []
             if card.type == .comparison && rows.count == 3 {
                 HStack(alignment: .top, spacing: 8) {
@@ -219,9 +221,7 @@ public struct CardView: View {
             if let body = card.body {
                 Text(Display.text(body, locale: locale)).font(.callout).foregroundStyle(Look.ink)
             }
-            if card.receipt != nil, openReceipt != nil {
-                receiptButton
-            } else if !card.assumptions.isEmpty || !card.basis.calcIDS.isEmpty {
+            if card.receipt == nil, !card.assumptions.isEmpty || !card.basis.calcIDS.isEmpty {
                 basis
             }
         }
